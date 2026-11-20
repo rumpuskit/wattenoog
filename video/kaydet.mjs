@@ -608,11 +608,14 @@ for (const [ci, shot] of S.cekimler.entries()) {
         s = O.simsekler(m0, m0 + 4)[0] ?? null;
       } else if (tur === "sicrama") {
         if (typeof O.canli !== "function") return { yok: "deniz olayı yok", m };
-        // Balina 46 sn'lik döngüde sıçrar: suyun 1 m üstüne çıktığı ilk an (0,05 sn adım, en çok 3 dk).
-        let once = (O.canli(m0) ?? [0, 9])[1];
+        // Balina 46 sn'lik döngüde sıçrar: suyun 1 m üstüne çıktığı ilk an (0,05 sn adım, en çok 3 dk). Kuzey Denizi muturu
+        // sıçramaz (deniz.js odak[4] = 1): sırtının suyu yardığı an (ham y −0,35'i yukarı geçer; nefesin tepesi −0,12).
+        const v0 = O.canli(m0) ?? [0, 9], nefes = v0[4] === 1, yOf = (v) => (nefes ? v[3] : v[1]), esik = nefes ? -0.35 : 1;
+        let once = nefes ? 0 : yOf(v0);
         for (let x = m0 + 1 / 1200; x < m0 + 3; x += 1 / 1200) {
-          const y = (O.canli(x) ?? [0, 0])[1];
-          if (once < 1 && y >= 1) { s = x; break; }
+          const v = O.canli(x);
+          const y = v ? yOf(v) : -9;
+          if (once < esik && y >= esik) { s = x; break; }
           once = y;
         }
       }

@@ -706,7 +706,8 @@ export function buildDeniz({ world, scene }) {
   }
 
   // --- kare güncellemesi ---
-  const odakDizi = [0, 0, 0], merkezDizi = [0, 0, 0];
+  // odak: [x, y (≥0,3, kamera hedefi), z, ham y, nefes modu (1: mutur; video hizalaması sıçrama yerine nefesi bekler)]
+  const odakDizi = [0, 0, 0, 0, SW ? 1 : 0], merkezDizi = [0, 0, 0];
   let aktifTur = null;
   function gizle() { group.visible = false; aktifTur = null; }
 
@@ -865,14 +866,15 @@ export function buildDeniz({ world, scene }) {
       // Şimdiki ya da bir sonraki vuruşun sahibi (eylem başlamadan kamera oraya bakabilsin).
       const c = Math.floor(t / B);
       let j = -1;
-      for (let b = c; b <= c + 2 && j < 0; b++) { const i = vurus(b); if (VT[i] >= 2) j = VS[i]; }
+      // Mutur sıçramaz (VT yalnız 0/1): şimdiki ya da sıradaki nefesin sahibi.
+      for (let b = c; b <= c + 2 && j < 0; b++) { const i = vurus(b); if (SW ? VT[i] === 1 : VT[i] >= 2) j = VS[i]; }
       if (j < 0) j = VS[vurus(c)];
       yunusDurum(j, t, YD2);
-      odakDizi[0] = YD2.x; odakDizi[1] = Math.max(0.3, YD2.y); odakDizi[2] = YD2.z;
+      odakDizi[0] = YD2.x; odakDizi[1] = Math.max(0.3, YD2.y); odakDizi[2] = YD2.z; odakDizi[3] = YD2.y;
     } else {
       balinaDurum(0, t, BD2);
       if (!BD2.olay) { const ax = BD2.x, ay = BD2.y, az = BD2.z; balinaDurum(1, t, BD2); if (!BD2.olay) { BD2.x = ax; BD2.y = ay; BD2.z = az; } }
-      odakDizi[0] = BD2.x; odakDizi[1] = Math.max(0.3, BD2.y); odakDizi[2] = BD2.z;
+      odakDizi[0] = BD2.x; odakDizi[1] = Math.max(0.3, BD2.y); odakDizi[2] = BD2.z; odakDizi[3] = BD2.y;
     }
     return odakDizi;
   }

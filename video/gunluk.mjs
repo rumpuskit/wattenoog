@@ -672,7 +672,10 @@ const ham = kesitler.map((k, i) => {
   // Bölünen ayarlı çekimde parça başına kadraj (7 Kasım kod notu: 2. parçanın sabit sapması temiz kadrajı bozuyordu):
   // {"yer"|"yorunge": .., "parcalar": [{aci, uzak, yuk} | {yorunge}, ...]} → k. parça (k ≥ 1) parcalar[k − 1] ile.
   const pk = k.parca > 0 && k.cekim && typeof k.cekim === "object" ? k.cekim.parcalar?.[k.parca - 1] : null;
-  if (pk) return yonet(parcaSaati(Object.assign(CEKIM({ ...k.cekim, ...pk, parcalar: undefined, hareket: undefined }, v, sure, k.arayuz), { parcaKadraj: true }), k), k, 0, i);
+  // Parçada ham kamera/yörünge varsa ana çekimin "yer"i düşer (20 Kasım deneme: yer öncelikli olduğu için parçanın yörüngesi
+  // yok sayılıyordu).
+  const pYer = pk && (pk.yorunge || pk.kamera) && pk.yer === undefined ? { yer: undefined } : {};
+  if (pk) return yonet(parcaSaati(Object.assign(CEKIM({ ...k.cekim, ...pYer, ...pk, parcalar: undefined, hareket: undefined }, v, sure, k.arayuz), { parcaKadraj: true }), k), k, 0, i);
   return yonet(parcaSaati(CEKIM(k.cekim, v, sure, k.arayuz), k), k, v, i);
 });
 /** Bölünen olay çekiminde k. parça olayın akışını sürdürür (17 Kasım QC: parçalar aynı anı baştan oynatıyor ya da
@@ -1021,9 +1024,13 @@ function olayCekimi(ad0, a, L) {
   }
   const cek = arac === "cekici", deniz = olay.tur === "yunus" || olay.tur === "balina";
   // Sis: denizden limana bakan hava çekimi daha yüksekten (alçakta iskele kadrajı kapatıyordu).
-  const [D, H] = cek ? [26, 8] : olay.tur === "sis" && ad === "olay-hava" ? [90, 16] : [b.D, b.H];
+  // Mutur (Wattenoog'un "yunus"u: 1,6 m, koyu, yalnız nefeste sırtı görünür; 20 Kasım deneme: varsayılan kadrajlar düz su
+  // veriyordu, yalnız ~13 m yakın kadraj hayvanı gösterdi): bütün olay kadrajları yakın ve alçak.
+  // Göz yüksekliği ≥ 4,5 m: alçakta dalga sırtı hayvanı örtüyor (yakın kadraj 2,2 m'de düz su verdi).
+  const MUTUR = { olay: [34, 12], "olay-yakin": [13, 4.5], "olay-kalabalik": [20, 5], "olay-tele": [26, 8], "olay-hava": [48, 10] };
+  const [D, H] = cek ? [26, 8] : olay.tur === "sis" && ad === "olay-hava" ? [90, 16] : olay.tur === "yunus" && MUTUR[ad] ? MUTUR[ad] : [b.D, b.H];
   const hava = olay.tur === "sis" || olay.tur === "firtina", sokakEv = hava && ad === "olay-kalabalik"; // seyirci yok: Marktplatz karşı yandan
-  const shot = { adres: a, hareket: { tur: null, hedef: ad, D, H, ...(b.goz ? { goz: b.goz } : {}) }, secenek: cek ? ["yorunge", "vinc", "alcak"] : sokakEv ? ["yanKay", "vinc"] : b.secenek, olayBek: olay.tur,
+  const shot = { adres: a, hareket: { tur: null, hedef: ad, D, H, ...(b.goz && olay.tur !== "yunus" ? { goz: b.goz } : {}) }, secenek: cek ? ["yorunge", "vinc", "alcak"] : sokakEv ? ["yanKay", "vinc"] : olay.tur === "yunus" && ad === "olay-yakin" ? ["yorunge", "vinc"] : b.secenek, olayBek: olay.tur,
     olayAni: arac ? ani.arac?.[arac] ?? ani.olay ?? "olay+5" : ani[ad] ?? ani.olay ?? "olay+5",
     ...(b.sarsinti && !sokakEv ? { sarsinti: b.sarsinti } : {}),
     // Hız: araç takibi 1,5; çekici yüklemesi 10; balina sıçraması gerçek zamanlı (~3,5 sn) → 1,2; fırtınada şimşek
@@ -1034,7 +1041,7 @@ function olayCekimi(ad0, a, L) {
   if (olay.tur === "firtina") shot.yagmur = true;
   // Olay anı (kaydet.mjs anAni): fırtınada sıradaki şimşek, balinada sıradaki sıçrama çekimin içine oturur.
   if (olay.tur === "firtina" && ad !== "olay-kalabalik") shot.anAni = { tur: "simsek" };
-  if (deniz && ad !== "olay-hava") shot.anAni = { tur: "sicrama" };
+  if (deniz && (ad !== "olay-hava" || olay.tur === "yunus")) shot.anAni = { tur: "sicrama" }; // mutur: nefes anı (kaydet.mjs)
   if (olay.tur === "sis") shot.sisduduk = true;
   // Limana/iskeleye bakan çekimler (sis hava; fırtına/sis yakın: iskelenin üstü): feribot iskelede olsun.
   if ((olay.tur === "sis" && ad === "olay-hava") || ((olay.tur === "sis" || olay.tur === "firtina") && ad === "olay-yakin")) shot.vapurAni = true;

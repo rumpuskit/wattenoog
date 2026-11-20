@@ -619,7 +619,7 @@ function drawHouse(K, b, floors, full, addWindow) {
     return;
   }
 
-  if (tip === "reihenhaus") {
+  if (tip === "kapitaenshaus") {
     // Four-square: her katta iki daire, boydan zemin kat verandası, kırma çatı ve ön çatı penceresi.
     for (let f = 0; f < floors; f++) {
       for (const lx of [-4.4, -2.0, 2.0, 4.4]) {

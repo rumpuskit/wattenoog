@@ -2,18 +2,19 @@
 // Saate ve kişiye göre deterministiktir: aynı anda bakan herkes aynı şeyi görür.
 import { roll } from "../sim.js";
 
+// Görünen metinler Almanca; zamirsiz (cinsiyet tahmin edilmez), cümle ortasında da büyük harfle başlayabilir.
 export const HOME_LABELS = {
-  uyku: "Asleep",
-  hazirlik: "Getting ready",
-  kahvalti: "Having breakfast",
-  yemek_yapma: "Cooking",
-  aksam_yemegi: "Having dinner",
-  tv: "Watching TV",
-  kitap: "Reading a book",
-  telefon: "Scrolling on their phone",
-  dinlenme: "Relaxing on the couch",
-  temizlik: "Tidying up",
-  calisma: "Working from home",
+  uyku: "Schläft",
+  hazirlik: "Macht sich fertig",
+  kahvalti: "Frühstückt",
+  yemek_yapma: "Kocht",
+  aksam_yemegi: "Beim Abendbrot",
+  tv: "Sieht fern",
+  kitap: "Liest ein Buch",
+  telefon: "Scrollt auf dem Handy",
+  dinlenme: "Entspannt auf dem Sofa",
+  temizlik: "Räumt auf",
+  calisma: "Arbeitet im Homeoffice",
 };
 
 /** seg: simülasyon parçası (ne: "ev" | "uyku"), minute: günün dakikası. */

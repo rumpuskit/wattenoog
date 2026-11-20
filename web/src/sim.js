@@ -229,15 +229,15 @@ export function mahalleName(mahalle) {
   return names[mahalle % names.length];
 }
 
-/** Sokak adı: ad + sonek ("Shell Street", "Oyster Lane"); ada içindeki her sokak için ayrı bir çift. */
+/** Sokak adı: kök + sonek, bitişik ("Möwenweg", "Deichtwiete"); ada içindeki her sokak için ayrı bir çift. */
 export function sokakName(mahalle, sokak) {
   const names = catalog.sokaklar, ekler = catalog.sokak_ekleri;
   const g = (mahalle % cap("mahalle_per_ada")) * cap("sokak_per_mahalle") + sokak;
   const n = g % names.length;
-  return `${names[n]} ${ekler[(Math.floor(g / names.length) + n) % ekler.length]}`;
+  return `${names[n]}${ekler[(Math.floor(g / names.length) + n) % ekler.length]}`;
 }
 
-/** Mahallenin konut tipi (katalog "konut"): friesenhaus 1, doppelhaus 2, reihenhaus 4, mehrfamilienhaus 8 birim/yapı. */
+/** Mahallenin konut tipi (katalog "konut"): friesenhaus 1, doppelhaus 2, kapitaenshaus 4, mehrfamilienhaus 8 birim/yapı. */
 export function housingOf(mahalle) {
   const mi = mahalle % cap("mahalle_per_ada");
   return catalog.konut.find((k) => k.son === undefined || mi <= k.son);
@@ -250,10 +250,10 @@ export function houseOf(slot) {
   return { tip: k.tip, birim: k.birim, ev: Math.floor(i / k.birim), apt: k.birim > 1 ? (i % k.birim) + 1 : 0 };
 }
 
-/** "14 Oyster Lane, Apt 2" (ev numarası sokakta 1'den, iki yana dönüşümlü). */
+/** "Möwenweg 14, Whg. 2" (Alman sırası: sokak, numara; ev numarası sokakta 1'den, iki yana dönüşümlü). */
 export function streetAddress(slot) {
   const p = addressParts(slot), h = houseOf(slot);
-  return `${h.ev + 1} ${sokakName(p.mahalle, p.sokak)}${h.apt ? `, Apt ${h.apt}` : ""}`;
+  return `${sokakName(p.mahalle, p.sokak)} ${h.ev + 1}${h.apt ? `, Whg. ${h.apt}` : ""}`;
 }
 
 export function addressText(slot) {
@@ -333,9 +333,23 @@ export function rank(r, day) {
   return catalog.terfi_gunleri.filter((threshold) => t >= threshold + shift).length;
 }
 
+// Almanca meslek adı cinsiyetle çekilir (Fischer/Fischerin) ve cinsiyet addan tahmin edilmez: kişi yorumda bir biçim
+// seçmediyse (overrides.form "m"/"w") unvan değil iş alanı ve kademe gösterilir: "Krabbenfischerei (Leitung)".
+const STUFE = ["Ausbildung", "", "erfahren", "Leitung"];
+
+/** Görünen meslek: seçilmiş biçimde unvan, yoksa iş alanı + kademe. */
 export function title(r, day) {
-  const ladder = job(r).kademeler;
-  return ladder[Math.min(rank(r, day), ladder.length - 1)];
+  const j = job(r), k = rank(r, day), form = override(r, "form");
+  const ladder = form === "w" ? j.kademeler_w ?? j.kademeler : form === "m" ? j.kademeler : null;
+  if (ladder) return ladder[Math.min(k, ladder.length - 1)];
+  const s = j.kademeler.length > 1 && j.stufen !== false ? STUFE[Math.min(k, STUFE.length - 1)] : "";
+  return s ? `${j.alan} (${s})` : j.alan;
+}
+
+/** Bir mesleğin seçilmiş biçimdeki unvanı (biçim yoksa iş alanı); kademe k. */
+export function jobTitle(j, k, form = "") {
+  const ladder = form === "w" ? j.kademeler_w ?? j.kademeler : form === "m" ? j.kademeler : null;
+  return ladder ? ladder[Math.min(k, ladder.length - 1)] : j.alan;
 }
 
 export function hobby(r) {

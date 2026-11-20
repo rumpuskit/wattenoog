@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { stations } from "./roads.js";
-import { ZONE, mainZ, zoneToWorld } from "./island.js";
+import { HAFEN_Z, ZONE, zoneToWorld } from "./island.js";
 import { MinHeap } from "./heap.js";
 import { mahalleName } from "../sim.js";
 import { pedState, signalState } from "./signals.js";
@@ -525,20 +525,20 @@ export class Traffic {
       const cycle = route.len / BUS_NOMINAL / 60 + (stops.length * BUS_DWELL) / 60;
       this.lines.push({ name, color, route, stops, headway, cycle, first: 360, last: 1440 - Math.ceil(cycle) - 5 });
     };
-    // Island Shuttle: Main Street ve Town Green çevresinde halka (feribot iskelesinin önünden geçer).
-    make("Island Shuttle", "#c43a3a", [[400, mainZ(400)], [-400, mainZ(-400)], [-90, -58], [90, -58]], 8);
+    // Inselbus: Hafenstraße (feribot iskelesinin önü), Hafenweg ve Marktplatz çevresi halkası.
+    make("Inselbus Hafen–Markt", "#e8c33a", [[300, HAFEN_Z], [-250, HAFEN_Z], [0, 300], [-115, -70], [115, -70], [0, 300]], 8);
     const built = w.zones.slice(0, w.mahalleler);
     if (built.length) {
-      // Neighborhood Loop: kasabadan kurulu mahallelerin giriş caddelerine uğrar.
-      const pts = [[300, mainZ(300)]];
+      // Ringlinie: köyden kurulu mahallelerin giriş caddelerine uğrar.
+      const pts = [[115, 70]];
       for (const z of built) pts.push(zoneToWorld(z, 0, ZONE.depth / 2));
-      pts.push([-300, mainZ(-300)]);
-      make("Neighborhood Loop", "#2f4256", pts, 10);
+      pts.push([-115, 70]);
+      make("Ringlinie", "#2f4256", pts, 10);
       // İlk mahallelerin kendi halkası: çevre yolları ve giriş caddesi boyunca.
       const colors = ["#3e7a5a", "#8a62d1", "#d9822b", "#2f7fb5", "#8e2f2a"];
       built.slice(0, 6).forEach((z, k) => {
         const e = ZONE.side;
-        make(`${mahalleName(z.m)} Loop`, colors[k % colors.length], [
+        make(`Linie ${mahalleName(z.m)}`, colors[k % colors.length], [
           zoneToWorld(z, 0, 20), zoneToWorld(z, z.hw - e, ZONE.depth / 2), zoneToWorld(z, 0, ZONE.depth - e), zoneToWorld(z, -z.hw + e, ZONE.depth / 2),
         ], 12);
       });

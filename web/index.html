@@ -1,14 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#7ec4ea" />
-    <title>Driftwood Island</title>
-    <meta name="description" content="Everyone who follows @wattenoog on TikTok gets a home, a job and a day on a small island town that grows with every new follower." />
+    <title>Insel Wattenoog</title>
+    <meta name="description" content="Wer @wattenoog auf TikTok folgt, bekommt auf einer kleinen Nordseeinsel ein Zuhause, einen Beruf und einen eigenen Tag. Die Insel wächst mit jedem neuen Follower." />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Driftwood Island · every follower lives here" />
-    <meta property="og:description" content="Follow on TikTok and move to the island: a home, a job and a day of your own." />
+    <meta property="og:title" content="Insel Wattenoog · hier wohnt jeder Follower" />
+    <meta property="og:description" content="Folg uns auf TikTok und zieh auf die Insel: dein Zuhause, dein Beruf, dein Tag." />
+    <meta property="og:locale" content="de_DE" />
     <meta property="og:image" content="https://wattenoog.rumpuskit.com/og.jpg" />
     <meta property="og:url" content="https://wattenoog.rumpuskit.com/" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -17,10 +18,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
     <script>
-      // Yükleme ekranı adanın o anki saatiyle açılır (ABD Doğu saati): şafak, gündüz, akşam, gece.
+      // Yükleme ekranı adanın o anki saatiyle açılır (Berlin saati): şafak, gündüz, akşam, gece.
       (function () {
         var h = 12;
-        try { h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23" }).format(new Date())) % 24; } catch (e) {}
+        try { h = Number(new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "numeric", hourCycle: "h23" }).format(new Date())) % 24; } catch (e) {}
         document.documentElement.dataset.vakit = h < 6 || h >= 20 ? "gece" : h < 8 ? "safak" : h < 17 ? "gun" : "aksam";
       })();
       if (location.protocol === "http:" && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
@@ -31,31 +32,31 @@
   <body>
     <canvas id="scene"></canvas>
 
-    <div id="speed" role="group" aria-label="Time speed (development)" hidden>
+    <div id="speed" role="group" aria-label="Zeitraffer (Entwicklung)" hidden>
       <button data-speed="1" class="on">1×</button>
       <button data-speed="60">60×</button>
       <button data-speed="600">600×</button>
     </div>
 
     <div id="floorbar" hidden>
-      <button id="floor-down" aria-label="Floor below"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-      <span id="floor-label">1st floor</span>
-      <button id="floor-up" aria-label="Floor above"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
-      <button id="floor-exit">Step outside</button>
+      <button id="floor-down" aria-label="Etage tiefer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <span id="floor-label">Erdgeschoss</span>
+      <button id="floor-up" aria-label="Etage höher"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+      <button id="floor-exit">Nach draußen</button>
     </div>
 
     <!-- Sol sütun: üst bilgi ve altında açılan kart aynı akışta (üst üste binmezler). -->
     <div id="sol">
       <header id="hud">
         <div class="hud-top">
-          <div class="brand"><img src="/favicon.svg" alt="" width="22" height="22" />Driftwood</div>
+          <div class="brand"><img src="/favicon.svg" alt="" width="22" height="22" />Wattenoog</div>
           <div class="clock" id="clock">--:--</div>
-          <button id="hud-ac" type="button" aria-expanded="false" aria-label="Show details"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button id="hud-ac" type="button" aria-expanded="false" aria-label="Details anzeigen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
         <div class="stats" id="stats"></div>
-        <div class="online" id="online" hidden><span class="dot"></span><span id="online-n">1</span> on the island now</div>
+        <div class="online" id="online" hidden><span class="dot"></span><span id="online-n">1</span> gerade auf der Insel</div>
         <button class="goal" id="next" hidden>
-          <span class="goal-head"><span class="goal-label"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V3.5"/><path d="M3 21h7"/><path d="M6 4h14.5"/><path d="M6 8.5 10.5 4"/><path d="M17.5 4v5"/><rect x="16" y="9" width="3" height="2.5" rx=".5"/></svg>Next</span><span class="goal-need" id="next-need"></span></span>
+          <span class="goal-head"><span class="goal-label"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V3.5"/><path d="M3 21h7"/><path d="M6 4h14.5"/><path d="M6 8.5 10.5 4"/><path d="M17.5 4v5"/><rect x="16" y="9" width="3" height="2.5" rx=".5"/></svg>Als Nächstes</span><span class="goal-need" id="next-need"></span></span>
           <span class="goal-name" id="next-name"></span>
           <span class="bar"><i id="next-bar"></i></span>
         </button>
@@ -63,11 +64,11 @@
         <button class="waiting gunun" id="gunun" hidden></button>
         <button class="waiting" id="waiting" hidden></button>
         <button class="waiting secim" id="secim" hidden></button>
-        <div class="links"><a id="cta" class="cta" target="_blank" rel="noopener">Follow on TikTok, move in</a><a class="priv" href="/privacy.html">Privacy</a></div>
+        <div class="links"><a id="cta" class="cta" target="_blank" rel="noopener">Auf TikTok folgen, einziehen</a><a class="priv" href="/privacy.html">Datenschutz</a><a class="priv" href="/impressum.html">Impressum</a></div>
       </header>
       <section id="card" hidden>
         <div class="grip" aria-hidden="true"></div>
-        <button id="card-close" aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        <button id="card-close" aria-label="Schließen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         <div class="card-head">
           <div class="avatar" id="card-icon" aria-hidden="true"></div>
           <div class="card-names">
@@ -78,9 +79,9 @@
         <div class="dream" id="card-dream" hidden></div>
         <div class="now" id="card-now"></div>
         <div id="card-tabs" role="tablist">
-          <button data-tab="simdi" class="on">Now</button>
-          <button data-tab="bugun">Today</button>
-          <button data-tab="hikaye">Story</button>
+          <button data-tab="simdi" class="on">Jetzt</button>
+          <button data-tab="bugun">Heute</button>
+          <button data-tab="hikaye">Geschichte</button>
         </div>
         <div id="card-traits"></div>
         <dl id="card-facts"></dl>
@@ -89,55 +90,55 @@
     </div>
 
     <div id="navbtns">
-      <button id="sound" aria-label="Ambient sound"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
-      <button id="compass" aria-label="Face north"><span id="compass-needle"><svg class="i pusula" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 16 12H8z" fill="#e0607a" stroke="none"/><path d="M12 21.5 8 12h8z" fill="currentColor" stroke="none" opacity=".4"/></svg></span></button>
-      <button id="zoom-in" aria-label="Zoom in">+</button>
-      <button id="zoom-out" aria-label="Zoom out">−</button>
+      <button id="sound" aria-label="Umgebungsgeräusche"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+      <button id="compass" aria-label="Nach Norden ausrichten"><span id="compass-needle"><svg class="i pusula" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 16 12H8z" fill="#e0607a" stroke="none"/><path d="M12 21.5 8 12h8z" fill="currentColor" stroke="none" opacity=".4"/></svg></span></button>
+      <button id="zoom-in" aria-label="Hineinzoomen">+</button>
+      <button id="zoom-out" aria-label="Herauszoomen">−</button>
     </div>
 
     <!-- Adada yapılacaklar: telefonda alt sekme çubuğu, masaüstünde aramanın üstünde etiketli şerit. -->
-    <nav id="dock" aria-label="On the island"></nav>
+    <nav id="dock" aria-label="Auf der Insel"></nav>
 
     <!-- Gazete, Benim evim, Anket: ortak açılır sayfa (masaüstünde ortada, telefonda alttan). -->
     <div id="sayfa" hidden role="dialog" aria-modal="true" aria-labelledby="sayfa-baslik">
       <div class="sayfa-kutu">
-        <div class="sayfa-ust"><h2 id="sayfa-baslik"></h2><button id="sayfa-kapat" aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+        <div class="sayfa-ust"><h2 id="sayfa-baslik"></h2><button id="sayfa-kapat" aria-label="Schließen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
         <div class="sayfa-govde" id="sayfa-govde"></div>
       </div>
     </div>
 
     <!-- Fotoğraf modu: arayüz gizlenir; altta saat kaydırıcısı ve çekim düğmesi. -->
     <div id="foto-bar" hidden>
-      <label class="foto-saat"><span id="foto-saat-yazi">--:--</span><input id="foto-saat" type="range" min="0" max="1439" step="5" aria-label="Time of day" /></label>
-      <button id="foto-cek" class="primary" aria-label="Take photo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13" r="3.3"/></svg>Snap</button>
-      <button id="foto-kapat" aria-label="Exit photo mode"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <label class="foto-saat"><span id="foto-saat-yazi">--:--</span><input id="foto-saat" type="range" min="0" max="1439" step="5" aria-label="Uhrzeit" /></label>
+      <button id="foto-cek" class="primary" aria-label="Foto aufnehmen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13" r="3.3"/></svg>Auslösen</button>
+      <button id="foto-kapat" aria-label="Fotomodus beenden"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div id="foto-onizleme" hidden>
-      <img id="foto-img" alt="Your photo" />
-      <div class="foto-dugmeler"><button id="foto-paylas" class="primary">Share</button><button id="foto-yeniden">Retake</button></div>
+      <img id="foto-img" alt="Dein Foto" />
+      <div class="foto-dugmeler"><button id="foto-paylas" class="primary">Teilen</button><button id="foto-yeniden">Nochmal</button></div>
     </div>
 
     <div id="minimap">
-      <button id="minimap-toggle" aria-label="Map"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5 9 4.5l6 2 5.5-2v13l-5.5 2-6-2-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/></svg></button>
+      <button id="minimap-toggle" aria-label="Karte"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5 9 4.5l6 2 5.5-2v13l-5.5 2-6-2-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/></svg></button>
       <canvas id="minimap-canvas"></canvas>
     </div>
 
     <div id="arama">
       <div id="yerler" hidden>
-        <div class="yerler-head">Places</div>
+        <div class="yerler-head">Orte</div>
         <div class="yerler-grid" id="yerler-grid"></div>
       </div>
       <ul id="oneriler" role="listbox" hidden></ul>
       <form id="search" autocomplete="off">
-        <button type="button" id="yerler-btn" aria-expanded="false" aria-controls="yerler"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span class="lbl">Places</span></button>
-        <input id="search-input" type="search" inputmode="search" enterkeyhint="search" spellcheck="false" placeholder="Search @username or a place" aria-label="Username or place" aria-controls="oneriler" />
-        <button type="submit" class="go">Find</button>
+        <button type="button" id="yerler-btn" aria-expanded="false" aria-controls="yerler"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span class="lbl">Orte</span></button>
+        <input id="search-input" type="search" inputmode="search" enterkeyhint="search" spellcheck="false" placeholder="@Name oder Ort suchen" aria-label="Benutzername oder Ort" aria-controls="oneriler" />
+        <button type="submit" class="go">Suchen</button>
       </form>
     </div>
 
     <!-- Bildirim ve tur: her panelin üstünde (kendi katmanlarında; #sol içinde dock/arama/sayfanın altında kalıyorlardı). -->
     <div id="toast" role="status" aria-live="polite" hidden></div>
-    <div id="tur" hidden><div id="tur-yazi"></div><button id="tur-basla" hidden>Start</button><button id="tur-bitir">End tour</button></div>
+    <div id="tur" hidden><div id="tur-yazi"></div><button id="tur-basla" hidden>Los</button><button id="tur-bitir">Rundgang beenden</button></div>
 
     <div id="loading">
       <svg class="load-scene" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -185,14 +186,14 @@
         <rect width="1600" height="1000" fill="url(#lg-vinyet)"/>
       </svg>
       <div class="load-head">
-        <h1 class="load-logo">Driftwood Island</h1>
-        <p class="load-sub">Every TikTok follower gets a home, a job and a day here</p>
+        <h1 class="load-logo">Insel Wattenoog</h1>
+        <p class="load-sub">Jeder TikTok-Follower bekommt hier ein Zuhause, einen Beruf und einen Tag</p>
       </div>
       <div class="load-box">
         <div class="load-panel">
-          <div class="load-row"><span class="load-step" id="load-step">Getting the resident list…</span><span class="load-pct" id="load-pct">0%</span></div>
+          <div class="load-row"><span class="load-step" id="load-step">Einwohnerliste wird geladen …</span><span class="load-pct" id="load-pct">0%</span></div>
           <div class="load-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="load-fill"></i></div>
-          <button id="enter" hidden>Enter the island<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <button id="enter" hidden>Auf die Insel<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           <p class="load-tip" id="load-tip"></p>
         </div>
         <p class="load-foot">@wattenoog · TikTok</p>

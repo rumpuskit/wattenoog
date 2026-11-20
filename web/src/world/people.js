@@ -16,7 +16,6 @@ import { pedWait } from "./signals.js";
 import { ferryOut, nextArrival, nextDeparture } from "./ferry.js";
 import { ETKINLIK, buildCinema, chooseActivity, dayTheme, favorites } from "./etkinlik.js";
 import { sunPosition, sunTimes } from "./sky.js";
-import { MAIN_X, mainZ } from "./island.js";
 import { dateKey, prefOf } from "../tercih.js";
 import { craneSeat, forkliftSeat, portMotion, shipWalkY, stackerSeat } from "./port.js";
 import { pointAt } from "./traffic.js";
@@ -74,7 +73,7 @@ const SUITCASES = [new Color("#3d5a80"), new Color("#9c2f3c"), new Color("#2f5d5
 const SCHOOL_TOPS = ["#2f4a6d", "#c43a3a", "#3e7a5a", "#e9b23a", "#7d8e9e"].map((c) => new Color(c)); // okulda forma yok: günlük kıyafet
 const DRIVER_TOP = new Color("#3b5a7a"), FIRE_TOP = new Color("#b8231f"), MEDIC_TOP = new Color("#e9eef2"), COP_TOP = new Color("#1f3f73");
 const DOG_COLORS = ["#8a5a32", "#2b2622", "#e8dcc4", "#c9954f", "#6b6b6b"].map((c) => new Color(c));
-const HUB = [0, 0]; // Town Green
+const HUB = [0, 0]; // Marktplatz
 const POSE_KEYS = ["y", "lie", "drop", "lean", "twist", "headYaw", "headPitch", "hipL", "hipR", "kneeL", "kneeR", "shL", "shR", "abL", "abR", "elL", "elR"];
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -320,21 +319,17 @@ export class People {
     for (const s of w.seats) add("seat:" + s.place, s);
     for (const s of w.places.iskele?.spots ?? []) add("fish", s);
     // İskele dolunca (ya da henüz yoksa) kıyıdan balık tutulur: liman cephesinin su kenarında, 3,5 m arayla.
-    const fp = w.ferryPier ? (w.ferryPier.x0 + w.ferryPier.x1) / 2 : 210;
-    for (let x = -280; x <= 170; x += 3.5) {
-      if (Math.abs(x - (w.places.iskele?.spots[0].x ?? -1e4)) < 6 || Math.abs(x - fp) < 9 || Math.abs(x + 300) < 22) continue; // iskeleler ve Fishing Wharf hariç
-      const [cx, cz] = w.coastPoint(x, mainZ(x), 0, 1, 1.6);
-      if (w.isWalkable(cx, cz) && w.height(cx, cz) > 0.2) add("fish", { x: cx, z: cz, heading: 0 });
+    // Rıhtımdan ve mendireklerden balık tutma noktaları (layout.js fishCoast; iskeleler hariç).
+    for (const [cx, cz, h] of w.fishCoast ?? []) {
+      if (Math.abs(cx - (w.places.iskele?.spots[0].x ?? -1e4)) < 6) continue;
+      if (w.isWalkable(cx, cz)) add("fish", { x: cx, z: cz, heading: h });
     }
     // Fotoğrafçılar: fenerin seyir noktaları (birbirine en az 2,5 m), sahil yolunun deniz kenarı, tepenin
     // zirvesi ve vapur iskelesinin ucu. Hepsi aynı yere yığılmaz.
     const views = [];
     const addView = (s) => { if (!views.some((v) => Math.hypot(v.x - s.x, v.z - s.z) < 2.5)) { views.push(s); add("view", s); } };
     for (const s of w.places.fener.spots.slice(1)) addView(s); // ilki fener bekçisinin
-    for (let x = -260; x <= 170; x += 12) {
-      const [cx, cz] = w.coastPoint(x + 3.5, mainZ(x + 3.5), 0, 1, 2.2);
-      if (w.isWalkable(cx, cz) && w.height(cx, cz) > 0.2) addView({ x: cx, z: cz, heading: 0 });
-    }
+    for (const [cx, cz, h] of w.viewCoast ?? []) if (w.isWalkable(cx, cz)) addView({ x: cx, z: cz, heading: h });
     const summit = w.places.tepe.anchors[0];
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2, [x, z] = w.nearestWalkable(summit[0] + Math.cos(a) * 9, summit[1] + Math.sin(a) * 9, 3);
@@ -393,16 +388,14 @@ export class People {
       if (!w.isWalkable(x, z)) return;
       (groups[place] ??= []).push({ x, z, cap, slots: Array.from({ length: cap }, () => []) });
     };
-    // Town Green: çardağın çevresinde ve çimende; Main Street'in tuğla kaldırımlarında vitrin önleri.
+    // Marktplatz: çeşmenin çevresinde ve meydanda; Strandstraße vitrin önleri aşağıda.
     for (let g = 0; g < 44; g++) {
       const a = g * 2.39996, r = 13 + ((g * 7) % 26);
       const x = Math.cos(a) * r * 1.6, z = Math.sin(a) * r;
-      if (Math.abs(x) < 72 && Math.abs(z) < 42) addGroup("meydan", x, z, 2 + (g % 4));
+      if (Math.abs(x) < 42 && Math.abs(z) < 32 && Math.hypot(x, z) > 10) addGroup("meydan", x, z, 2 + (g % 4));
     }
-    for (let x = MAIN_X[0] + 20, g = 0; x < MAIN_X[1] - 20; x += 38, g++) {
-      const s = (mainZ(x + 1) - mainZ(x - 1)) / 2, L = Math.hypot(1, s), side = g % 2 ? 1 : -1;
-      addGroup("meydan", x - (s / L) * side * 6.6, mainZ(x) + (1 / L) * side * 6.6, 2 + (g % 2));
-    }
+    // Strandstraße'nin klinker yolunda vitrin önleri (carsiWalks; klinker döşenmeden önce yolun iki yanı).
+    for (const [k, line] of (w.carsiWalks ?? []).entries()) for (let i = 2 + k; i < line.length - 1; i += 4) addGroup("meydan", line[i][0], line[i][1], 2 + (i % 2));
     for (const place of ["park", "tepe", "sahil_yolu", "plaj", "pazar", "fener", ...Object.keys(w.places).filter((k) => k.startsWith("mahalle:"))]) {
       const pl = w.places[place];
       if (!pl) continue;

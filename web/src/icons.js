@@ -75,6 +75,7 @@ export const BINA_SIMGE = {
 export const ARAC_SIMGE = { zeplin: "zeplin", car: "araba", taxi: "taksi", bus: "otobus", ambulans: "ambulans", itfaiye: "kamyon", cop: "kamyon" };
 /** Haritadaki yerler → simge. */
 export const YER_SIMGE = {
-  "Town Green": "agac", "Ferry Landing": "vapur", "Harbor Walk": "dalga", "Kettle Pond Park": "agac", "Ocean Beach": "semsiye",
-  "Bluff Head": "dag", "Gull Point Light": "fener", "Cranberry Bog": "basak", "Apple Orchard": "basak", "Driftwood Blimp": "zeplin",
+  Marktplatz: "agac", "Fähranleger": "vapur", Strandstraße: "sepet", Strandpromenade: "dalga", Kurpark: "agac", Hauptstrand: "semsiye",
+  Wasserturm: "dag", "Leuchtturm Westkopf": "fener", Watt: "dalga", Deich: "yurur", Polder: "basak", "Gulfhof Osterdorf": "basak",
+  "Kurhaus Wattenoog": "kamu", "Sportplatz SV Wattenoog": "top", "Wattenoog-Zeppelin": "zeplin",
 };

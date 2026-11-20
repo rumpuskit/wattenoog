@@ -3,6 +3,7 @@
 
 Kullanım:
     python3 import_followers.py liste.json [--day N] [--force] [--dry-run]
+    python3 import_followers.py --taban [--zorla] liste.json     # eski takipçileri tabana yaz (bir kez; taşımaz)
 
 Asıl kaynak, Mac'teki tik.ninja takibinin günde 3 kez ssh ile yolladığı listedir (tasinma.py bu
 modülün aktar() işlevini çağırır). Elle verilen dosya da okunur: aynı biçimdeki liste
@@ -10,12 +11,15 @@ modülün aktar() işlevini çağırır). Elle verilen dosya da okunur: aynı bi
 (zip ya da içindeki user_data*.json / Follower*.txt).
 Kurallar:
   - Takibi bırakan bu aktarımda ayrılır; evi 7 gün tutulur, bu sürede dönerse aynı evine döner.
-  - 7 günü geçen ayrılanın kaydı silinir (KVKK: gerekenden uzun tutulmaz), evi boşa çıkar.
+  - 7 günü geçen ayrılanın kaydı silinir (DSGVO: gerekenden uzun tutulmaz), evi boşa çıkar.
   - Yeni gelenler takip sırasına göre önce boş evlere, sonra adanın ucundaki yeni evlere yerleşir.
     Böylece mahalleler delik deşik kalmaz, tek kişilik görevler (fener bekçisi) de boş kalmaz.
     tik.ninja takip zamanını sayfa başına verir; aynı sayfadakileri listedeki sıra ayırır.
   - Çıkma isteyenler (cikanlar) bir daha taşınmaz.
-  - Dışa aktarım aktif nüfusun %80'inden azını içeriyorsa yarım dosya olabilir; --force olmadan işlenmez.
+  - Taban (DEVIR §4.7): hesabın ilk canlı taramadaki takipçileri (yalnız tuzlu özetleri, `taban`) taşınmaz; yorumda
+    katılım yazanlar (`katilim`) katılım sırasıyla gelir. Tabanda olmayan yeni takipçiler eskisi gibi taşınır.
+  - Dışa aktarım aktif nüfusun %80'inden azını içeriyorsa yarım dosya olabilir; --force olmadan işlenmez. Oran
+    taşınabilecekler (katılmamış eski takipçiler hariç) ile sakinler arasında.
 """
 
 import argparse
@@ -29,7 +33,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from wattenoog_sim import sim
-from ortak import DB, RETURN_WINDOW_DAYS, key_of, opt_out_hash, psql, publish
+import ortak
+from ortak import DB, ISTEK_GUN, RETURN_WINDOW_DAYS, key_of, opt_out_hash, psql, publish
 
 HANDLE_RE = re.compile(r"^[a-z0-9._]{1,30}$")
 MIN_RATIO = 0.8
@@ -153,12 +158,14 @@ IMPORT_SQL = """
 BEGIN;
 CREATE TEMP TABLE gelenler (handle text PRIMARY KEY, seed bigint NOT NULL, ts bigint NOT NULL, sira bigint NOT NULL) ON COMMIT DROP;
 COPY gelenler FROM STDIN;
-{rows}
-\\.
+{rows}\\.
 
--- 7 günden uzun süredir ayrı olanların kaydı silinir, evleri boşa çıkar.
+-- 7 günden uzun süredir ayrı olanların kaydı silinir, evleri boşa çıkar. Ayrılmadan önce yazılmış katılım kaydı da
+-- (eski takipçi geri dönerse taban özeti durduğu için yeniden katılım yazmalı; ayrıldıktan sonra yazdıysa kalır).
 WITH d AS (
-    DELETE FROM sakinler WHERE left_day IS NOT NULL AND :day - left_day > {window} RETURNING 1
+    DELETE FROM sakinler WHERE left_day IS NOT NULL AND :day - left_day > {window} RETURNING handle, left_day
+), k AS (
+    DELETE FROM katilim kt USING d WHERE kt.handle = d.handle AND kt.gun <= d.left_day RETURNING 1
 ) SELECT count(*) AS silinen FROM d \\gset
 
 -- 7 gün içinde dönenler eski evine döner.
@@ -192,6 +199,10 @@ WITH yeni AS (
     RETURNING 1
 ) SELECT count(*) AS gelen FROM d \\gset
 
+-- 30 gün içinde taşınmamış katılımlar (listede hiç görünmedi: takibi bırakmış) silinir.
+DELETE FROM katilim k WHERE k.eklendi < now() - make_interval(days => {istek_gun})
+    AND NOT EXISTS (SELECT 1 FROM sakinler s WHERE s.platform = :'pf' AND s.handle = k.handle);
+
 INSERT INTO aktarimlar (platform, day, dosya_sha256, takipci, gelen, donen, ayrilan, silinen)
 VALUES (:'pf', :day, :'sha', :takipci, :gelen, :donen, :ayrilan, :silinen);
 
@@ -203,6 +214,64 @@ SELECT json_build_object(
 """
 
 
+def taban_suz(followers: dict[str, tuple[int, int]], day: int, platform: str = "tt",
+              db: str = DB) -> tuple[dict[str, tuple[int, int]], int, list[str]]:
+    """Taban (eski takipçiler) süzgeci: (taşınabilecekler, katılmamış eski takipçi sayısı, listedeki katılanlar).
+    Tabandaki biri yalnız katılım kaydı varsa geçer, sıra anahtarı katılım zamanı olur (katılım sırasıyla yerleşir).
+    Kaydı olan (adada ya da 7 günlük dönüş süresinde) her zaman geçer. Bu taşınmada silinecek kayıt (7 günü geçmiş)
+    ve onunla silinecek katılım sayılmaz: 8. gün dönen eski takipçi yeniden katılım yazmalı. Taban alınmamışsa liste
+    olduğu gibi döner."""
+    taban = ortak.taban_ozetleri(db)
+    if not taban:
+        return followers, 0, []
+    tuz = ortak.taban_tuz()
+    gecerli = f"left_day IS NULL OR {int(day)} - left_day <= {RETURN_WINDOW_DAYS}"
+    # Katılım, bu taşınmada silinecek kayıtla birlikte silinecekse (ayrılmadan önce yazılmış) sayılmaz.
+    katilim = json.loads(psql(f"""SELECT coalesce(json_object_agg(k.handle, extract(epoch FROM k.eklendi)::bigint), '{{}}')
+                                  FROM katilim k LEFT JOIN sakinler s ON s.platform = '{platform}' AND s.handle = k.handle
+                                  WHERE s.handle IS NULL OR ({gecerli.replace("left_day", "s.left_day")})
+                                     OR k.gun > s.left_day""", db))
+    kayitli = set(json.loads(psql(f"SELECT coalesce(json_agg(handle), '[]') FROM sakinler WHERE platform = '{platform}' AND ({gecerli})", db)))
+    out: dict[str, tuple[int, int]] = {}
+    disarida = 0
+    for h, v in followers.items():
+        if h in kayitli:
+            out[h] = v
+        elif h in katilim:
+            out[h] = (int(katilim[h]), 0)
+        elif ortak.taban_ozet(h, tuz, platform) in taban:
+            disarida += 1
+        else:
+            out[h] = v
+    return out, disarida, [h for h in out if h in katilim]
+
+
+def taban_al(followers: dict[str, tuple[int, int]], takipci: int | None = None, zorla: bool = False,
+             platform: str = "tt", db: str = DB) -> dict:
+    """Tabanı bir kez alır: listedeki herkesin (o an adada oturanlar hariç) yalnız tuzlu özetini `taban`a yazar,
+    kullanıcı adlarını yazmaz. Taban zaten varsa --zorla olmadan reddeder (taban büyümez). İskelede bekleyen
+    görünmesinler diye 'disarida' = profil sayısı − nüfus olarak yazılır (ilk taşınma onu yeniden hesaplar)."""
+    if not followers:
+        raise AktarimHatasi("listede geçerli kullanıcı adı yok")
+    var = int(psql("SELECT count(*) FROM taban", db))
+    if var and not zorla:
+        raise AktarimHatasi(f"taban zaten alınmış ({var} özet); taban bir kez alınır ve büyümez. "
+                            "Yeniden almak için --zorla (eski özetler silinir).")
+    tuz = ortak.taban_tuz(olustur=True)
+    sakin = set(json.loads(psql(f"SELECT coalesce(json_agg(handle), '[]') FROM sakinler WHERE platform = '{platform}' AND left_day IS NULL", db)))
+    ozetler = sorted({ortak.taban_ozet(h, tuz, platform) for h in followers if h not in sakin})
+    takipci = takipci if isinstance(takipci, int) and takipci >= len(followers) else len(followers)
+    rows = "".join(o + "\n" for o in ozetler)
+    psql(f"""BEGIN;
+DELETE FROM taban;
+COPY taban (ozet) FROM STDIN;
+{rows}\\.
+INSERT INTO durum (anahtar, deger) VALUES ('disarida', jsonb_build_object('sayi', greatest(0, {takipci} - {len(sakin)})))
+ON CONFLICT (anahtar) DO UPDATE SET deger = EXCLUDED.deger, updated_at = now();
+COMMIT;""", db)
+    return {"taban": len(ozetler), "adada_atlanan": len(followers) - len(ozetler), "silinen_eski": var}
+
+
 def aktar(followers: dict[str, tuple[int, int]], sha: str, platform: str = "tt", day: int | None = None,
           db: str = DB, force: bool = False, dry_run: bool = False, yayinla: bool = True) -> dict:
     """Listeyi şehre işler ve (deneme değilse) yayınlar. Aynı liste daha önce işlendiyse
@@ -210,21 +279,27 @@ def aktar(followers: dict[str, tuple[int, int]], sha: str, platform: str = "tt",
     day = sim.day_of(time.time()) if day is None else day
     if not followers:
         raise AktarimHatasi("listede geçerli kullanıcı adı yok")
-    if psql(f"SELECT 1 FROM aktarimlar WHERE dosya_sha256 = '{sha}'", db):
-        return {"atlandi": True}
     opted_out = set(psql("SELECT ozet FROM cikanlar", db).split())
     followers = {h: v for h, v in followers.items() if opt_out_hash(platform, h) not in opted_out}
+    followers, taban_bekleyen, katilan = taban_suz(followers, day, platform, db)
+    if katilan:
+        # Katılım listeyi değiştirmeden de taşınma gerektirir: aynı liste, yeni katılımla yeniden işlenir.
+        sha = hashlib.sha256(f"{sha}|katilim:{','.join(sorted(katilan))}".encode()).hexdigest()
+    if psql(f"SELECT 1 FROM aktarimlar WHERE dosya_sha256 = '{sha}'", db):
+        return {"atlandi": True}
     active = int(psql(f"SELECT count(*) FROM sakinler WHERE left_day IS NULL AND platform = '{platform}'", db))
     if len(followers) < MIN_RATIO * active and not force:
         raise AktarimHatasi(f"listede {len(followers)} kişi var, şehirde {active}. "
                             "Yarım liste olabilir; eminsen --force ile çalıştır.")
 
-    rows = "\n".join(f"{h}\t{sim.seed_of(key_of(platform, h))}\t{ts}\t{sira}" for h, (ts, sira) in followers.items())
-    sql = IMPORT_SQL.format(rows=rows, window=RETURN_WINDOW_DAYS, end="ROLLBACK" if dry_run else "COMMIT")
+    rows = "".join(f"{h}\t{sim.seed_of(key_of(platform, h))}\t{ts}\t{sira}\n" for h, (ts, sira) in followers.items())
+    sql = IMPORT_SQL.format(rows=rows, window=RETURN_WINDOW_DAYS, istek_gun=ISTEK_GUN, end="ROLLBACK" if dry_run else "COMMIT")
     variables = ["-v", f"day={day}", "-v", f"sha={sha}", "-v", f"takipci={len(followers)}", "-v", f"pf={platform}"]
     eski = psql("SELECT deger FROM durum WHERE anahtar = 'zirve'", db)
     eski = json.loads(eski)["sayi"] if eski else 0
     result = json.loads(psql(sql, db, variables))
+    if taban_bekleyen:
+        result["taban_bekleyen"] = taban_bekleyen  # listede olup katılım yazmamış eski takipçiler (taşınmadı)
     # Bu taşınmayla adada açılanlar (gelişim tablosundan): taşınma videosunun malzemesi.
     yeni = max(eski, result.pop("en_buyuk"))
     result["acilan"] = [st["ad"] for st in sim.catalog()["gelisim"] if eski < st["nufus"] <= yeni]
@@ -238,7 +313,9 @@ def aktar(followers: dict[str, tuple[int, int]], sha: str, platform: str = "tt",
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("exports", nargs="+", type=Path)
-    parser.add_argument("--day", type=int, default=sim.day_of(time.time()), help="ada günü, ABD Doğu saati (varsayılan: bugün)")
+    parser.add_argument("--day", type=int, default=sim.day_of(time.time()), help="ada günü, Berlin saati (varsayılan: bugün)")
+    parser.add_argument("--taban", action="store_true", help="taşıma yapma: listedekileri tabana (eski takipçiler) yaz")
+    parser.add_argument("--zorla", action="store_true", help="--taban ile: var olan tabanı silip yeniden al")
     parser.add_argument("--db", default=DB)
     parser.add_argument("--force", action="store_true", help="nüfus düşüşü kontrolünü atla")
     parser.add_argument("--dry-run", action="store_true", help="hesapla ama kaydetme")
@@ -246,6 +323,9 @@ def main() -> None:
 
     try:
         followers, sha = read_export(args.exports)
+        if args.taban:
+            print(json.dumps(taban_al(followers, None, args.zorla, "tt", args.db), ensure_ascii=False))
+            return
         result = aktar(followers, sha, "tt", args.day, args.db, args.force, args.dry_run)
     except AktarimHatasi as e:
         sys.exit(f"HATA: {e}")

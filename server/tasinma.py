@@ -8,11 +8,16 @@ zorunlu komutudur (wattenoog kullanıcısının authorized_keys'i); veri stdin'd
         Günde 3 kez (taşınma): aktif takipçilerin tam listesi, import_followers.aktar() ile şehre işlenir.
     {"tur": "yorumlar", "hesap": ad, "yorumlar": [[yorum kimliği, ad, unix zaman, metin], ...]}
         Taşınmadan hemen sonra: videolarımıza son okumadan beri gelen yorumlar. istekler.py ayrıştırır;
-        metin saklanmaz, yalnız geçerli istekler (meslek, hobi, evcil, adımı gizle) kaydedilir. Açık
-        belediye başkanlığı seçiminde adaylık ve oylar da (secim.py).
+        metin saklanmaz, yalnız geçerli istekler (meslek, biçim, hobi, evcil, adımı gizle, katılım, çıkma)
+        kaydedilir. Eski takipçinin (taban) katılımı `katilim`a yazılır. Açık belediye başkanlığı seçiminde
+        adaylık ve oylar da (secim.py).
 
 Çıktı tek satır JSON; hata olursa {"hata": "..."} ve çıkış kodu 1. Aynı anda tek çalıştırma (kilit).
 Elle deneme:  echo '{"tur": "sayi", "takipci": 3}' | python3 tasinma.py
+
+Taban (DEVIR §4.7; bir kez, açılış videosundan hemen önce, operatör elle; ssh zorunlu komutu argüman almadığı için
+Mac'in anahtarı bunu çalıştıramaz). Girdi "liste" mesajıyla aynı biçim; yalnız tuzlu özetler yazılır:
+    python3 tasinma.py taban [--zorla] < liste.json
 """
 
 import fcntl
@@ -25,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import istekler  # noqa: E402
 import secim  # noqa: E402
-from import_followers import AktarimHatasi, _tikninja_json, aktar  # noqa: E402
+from import_followers import AktarimHatasi, _tikninja_json, aktar, taban_al  # noqa: E402
 from ortak import DB, ROOT, psql, publish  # noqa: E402
 
 MAX_BYTES = 64 << 20  # ~1M takipçilik liste
@@ -55,15 +60,18 @@ def liste(takipci: int, items: list) -> dict:
         # Ada henüz boş ve takipçi yok (ya da hepsi listede görünmeyen hesaplar): hata değil.
         durum_yaz("tt_takipci", takipci)
         durum_yaz("disarida", takipci)
+        durum_yaz("katilim_disarida", katilim_disarida())
         return {"gelen": 0, "ayrilan": 0, "donen": 0, "nufus": 0, "acilan": [], "yayin": publish()}
     # Özet içeriğe göre: değişmeyen liste ikinci kez işlenmez (aktarimlar.dosya_sha256).
     sha = hashlib.sha256(json.dumps(sorted(followers.items())).encode()).hexdigest()
     sonuc = aktar(followers, sha, yayinla=False)
     if sonuc.get("atlandi"):
         sonuc = {"atlandi": True, "nufus": nufus}
-    # Profilde sayılıp listede hiç görünmeyenler (gizli/kısıtlı hesaplar, çıkanlar) iskelede beklemez.
+    # Profilde sayılıp listede hiç görünmeyenler (gizli/kısıtlı hesaplar, çıkanlar) ve katılmamış eski takipçiler
+    # (taban) iskelede beklemez: hepsi disarida'da. Taşınmadan sonra katılanlar ortak.publish'te bekleyene eklenir.
     durum_yaz("tt_takipci", takipci)
     durum_yaz("disarida", max(0, takipci - sonuc["nufus"]))
+    durum_yaz("katilim_disarida", katilim_disarida())
     # Taşınmadan önce yorum yazıp şimdi gelenlerin bekleyen istekleri.
     if uygulanan := istekler.uygula():
         sonuc["istek_uygulanan"] = uygulanan
@@ -75,6 +83,19 @@ def liste(takipci: int, items: list) -> dict:
     sonuc["yayin"] = publish()
     if n := kayit_temizle():
         sonuc["tercih_silinen"] = n
+    return sonuc
+
+
+def katilim_disarida() -> int:
+    """Taşınmadan sonra hâlâ adada kaydı olmayan katılımlar: listede değiller (takibi bırakmış), iskelede beklemezler."""
+    return int(psql("""SELECT count(*) FROM katilim k WHERE NOT EXISTS
+                       (SELECT 1 FROM sakinler s WHERE s.platform = 'tt' AND s.handle = k.handle)"""))
+
+
+def taban(msg: dict, zorla: bool) -> dict:
+    followers = _tikninja_json(msg if isinstance(msg, dict) else {})
+    sonuc = taban_al(followers, msg.get("takipci") if isinstance(msg, dict) else None, zorla)
+    sonuc["yayin"] = publish()
     return sonuc
 
 
@@ -95,23 +116,31 @@ def yorumlar(hesap: str | None, items: list) -> dict:
     # Açık seçim varsa adaylık ve oylar (yorum metninden; metin saklanmaz) ve sitede verilenler.
     if s := secim.yorumlar(items + (secim.site_items() if secim.acik() else []), hesap):
         sonuc["secim"] = s
-    if sonuc["uygulanan"] or any(sonuc.get("secim", {}).values()):
+    if sonuc["uygulanan"] or sonuc.get("katilim") or any(sonuc.get("secim", {}).values()):
         sonuc["yayin"] = publish()
     return sonuc
 
 
 def main() -> int:
+    komut = sys.argv[1:]
+    if komut and komut[0] != "taban" or komut[1:] not in ([], ["--zorla"]):
+        print("Kullanım: tasinma.py < mesaj.json  |  tasinma.py taban [--zorla] < liste.json", file=sys.stderr)
+        return 2
     raw = sys.stdin.buffer.read(MAX_BYTES + 1)
     try:
         if len(raw) > MAX_BYTES:
             raise ValueError("veri çok büyük")
         msg = json.loads(raw)
+        if not isinstance(msg, dict):
+            raise ValueError("JSON nesnesi bekleniyor")
         takipci = msg.get("takipci")
-        if msg.get("tur") != "yorumlar" and (not isinstance(takipci, int) or takipci < 0):
+        if not komut and msg.get("tur") != "yorumlar" and (not isinstance(takipci, int) or takipci < 0):
             raise ValueError("takipci sayısı yok")
         with open(ROOT / "tasinma.lock", "w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            if msg.get("tur") == "yorumlar" and isinstance(msg.get("yorumlar"), list):
+            if komut:
+                out = taban(msg, "--zorla" in komut)
+            elif msg.get("tur") == "yorumlar" and isinstance(msg.get("yorumlar"), list):
                 hesap = msg.get("hesap")
                 out = yorumlar(str(hesap).lower() if hesap else None, msg["yorumlar"])
             elif msg.get("tur") == "sayi":

@@ -7,9 +7,22 @@ import { quay } from "./island.js";
 
 const tmp = new THREE.Color();
 
+const WATT = new THREE.Color("#8a8070"), WATT_DARK = new THREE.Color("#6f6656"), MARSH = new THREE.Color("#7f8f5a"), MARSH_DRY = new THREE.Color("#93a165");
+
 function terrainColor(world, x, z, h, ny) {
-  if (h < -0.2) return tmp.copy(P.WET_SAND).lerp(P.SEABED, Math.min(1, -h / 7));
+  const south = z > -420; // ada ekseninin güneyi: Wattenmeer kıyısı
+  // Gelgit kuşağı (−1,0 … +0,95): güneyde ıslak Watt çamuru (dalga izli), kuzeyde ıslak kum; altı deniz tabanı.
+  if (h < -1.0) return tmp.copy(south ? WATT_DARK : P.WET_SAND).lerp(P.SEABED, Math.min(1, (-h - 1.0) / 6));
   const d = world.sdf(x, z);
+  if (d > -2 && h < 0.95) {
+    if (south) {
+      const r = fbm(x / 9, z / 3.5, 27) + 0.5; // dalga izi (Rippel)
+      return tmp.copy(WATT).lerp(WATT_DARK, Math.min(1, Math.max(0, r * 0.9 - 0.1 + (0.2 - h) * 0.15)));
+    }
+    return tmp.copy(P.WET_SAND).lerp(P.SAND, Math.min(1, Math.max(0, (h + 0.2) / 1.2)));
+  }
+  // Tuzlu bataklık (setin önü, +0,6 … +0,95): zeytin yeşili, kıyıya doğru koyulaşan, ince kanallı.
+  if (south && h < 1.0 && world.zoneAt?.(x, z) === "deich") return tmp.copy(MARSH).lerp(MARSH_DRY, Math.min(1, Math.max(0, fbm(x / 20, z / 20, 29) + 0.5)));
   const coastal = d > world.margin(x, z) - 30;
   if (coastal && h < 1.0) return tmp.copy(P.SAND); // tesviye omzu (FLAT_Y − 0,12) çimen kalır
   if (ny < 0.62) return tmp.copy(P.ROCK);
@@ -191,9 +204,10 @@ export function buildWater(world) {
   const data = new Uint8Array(N * N * 4);
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
+      // Kırmızı kanal: arazi/taban yüksekliği (−12 … +3 m → 0 … 1); derinlik gölgede gelgit seviyesine göre bulunur.
       const h = world.rawHeight(x0 + ((i + 0.5) / N) * w, z0 + ((j + 0.5) / N) * d);
-      const depth = Math.max(0, Math.min(1, -h / 12));
-      data[(j * N + i) * 4] = Math.round(depth * 255);
+      const enc = Math.max(0, Math.min(1, (h + 12) / 15));
+      data[(j * N + i) * 4] = Math.round(enc * 255);
       data[(j * N + i) * 4 + 3] = 255;
     }
   }
@@ -203,6 +217,7 @@ export function buildWater(world) {
 
   const uniforms = {
     uTime: { value: 0 },
+    uLevel: { value: 0 },
     uDepth: { value: depthTex },
     uRect: { value: new THREE.Vector4(x0, z0, w, d) },
     uShallow: { value: new THREE.Color("#58c9d4") },
@@ -217,7 +232,7 @@ export function buildWater(world) {
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>
       varying vec3 vWaterWorld;
-      uniform float uTime; uniform sampler2D uDepth; uniform vec4 uRect; uniform vec3 uShallow; uniform vec3 uDeep;
+      uniform float uTime; uniform float uLevel; uniform sampler2D uDepth; uniform vec4 uRect; uniform vec3 uShallow; uniform vec3 uDeep;
       // Birkaç yönlü sinüs dalgası: eğimi döndürür (dalga yüksekliği yok, yalnızca ışık oyunu).
       vec2 waveSlope(vec2 p, float t) {
         vec2 s = vec2(0.0);
@@ -232,7 +247,8 @@ export function buildWater(world) {
       }`)
       .replace("#include <color_fragment>", `#include <color_fragment>
       vec2 duv = (vWaterWorld.xz - uRect.xy) / uRect.zw;
-      float depth = (duv.x < 0.0 || duv.y < 0.0 || duv.x > 1.0 || duv.y > 1.0) ? 1.0 : texture2D(uDepth, duv).r;
+      float hb = (duv.x < 0.0 || duv.y < 0.0 || duv.x > 1.0 || duv.y > 1.0) ? -12.0 : texture2D(uDepth, duv).r * 15.0 - 12.0;
+      float depth = clamp((uLevel - hb) / 12.0, 0.0, 1.0);
       diffuseColor.rgb = mix(uShallow, uDeep, smoothstep(0.0, 0.6, depth));
       // Kıyı köpüğü: çok sığ suda, dalga ritmiyle gelip giden açık bant.
       float foamBand = smoothstep(0.055, 0.0, depth) * (0.55 + 0.45 * sin(uTime * 1.4 + vWaterWorld.x * 0.15 + vWaterWorld.z * 0.11));
@@ -256,6 +272,8 @@ export function buildWater(world) {
   seabed.position.y = -12.5;
   group.add(seabed, water);
   group.userData.tick = (t) => { uniforms.uTime.value = t; };
+  // Gelgit: su yüzeyi seviyeye göre iner kalkar (gelgit.js; main.js her karede çağırır).
+  group.userData.setTide = (level) => { water.position.y = level; uniforms.uLevel.value = level; };
   return group;
 }
 

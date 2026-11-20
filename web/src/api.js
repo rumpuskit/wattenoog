@@ -25,9 +25,11 @@ async function call(method, path, body, auth = false) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 8000);
   try {
-    const res = await fetch(KAYIT_URL + path, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: ctl.signal });
+    // Görünen hata metinleri Almanca: zaman aşımı ve ağ hatası tarayıcının (dile göre değişen) metniyle gösterilmez.
+    const res = await fetch(KAYIT_URL + path, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: ctl.signal })
+      .catch((e) => { throw new Error(e?.name === "AbortError" ? "Zeitüberschreitung" : "keine Verbindung"); });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.hata ?? `HTTP ${res.status}`);
+    if (!res.ok) throw new Error(data.hata ?? `Fehler ${res.status}`);
     return data;
   } finally {
     clearTimeout(timer);
@@ -58,5 +60,5 @@ export const api = {
   anket: (ids) => call("GET", `/api/anket?id=${ids.join(",")}&cihaz=${deviceId()}`),
   oy: (id, secim) => call("POST", "/api/anket", { id, secim, cihaz: deviceId() }),
   bulundu: (gun, post = false) => (post ? call("POST", "/api/bulundu", { gun, cihaz: deviceId() }) : call("GET", `/api/bulundu?gun=${gun}`)),
-  tercihler: async () => { const r = await call("GET", "/tercihler.json"); if (!r || typeof r.tercih !== "object") throw new Error("no list"); return r; },
+  tercihler: async () => { const r = await call("GET", "/tercihler.json"); if (!r || typeof r.tercih !== "object") throw new Error("keine Liste"); return r; },
 };

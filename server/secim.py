@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Mayor seçimi: Town Hall açılınca (katalog: belediye:0) adanın ilk seçimi başlar.
+"""Bürgermeister seçimi: Rathaus açılınca (katalog: belediye:0) adanın ilk seçimi başlar.
 
-Seçim 3 gün sürer; kazananın dönemi 30 gün, sonra yeni seçim. Her şey yorumlarla (İngilizce):
-    I'm running / running for mayor / I want to be mayor / vote for me   → aday olur (adada oturuyorsa)
-    vote: @handle / my vote goes to @handle / voting for @handle          → o adaya oy (seçmen adada oturmalı)
+Seçim 3 gün sürer; kazananın dönemi 30 gün, sonra yeni seçim. Her şey yorumlarla (Almanca; umlautsuz yazım da geçer):
+    ich kandidiere / ich trete an / ich will Bürgermeister(in) werden / wählt mich   → aday olur (adada oturuyorsa)
+    Stimme: @handle / ich wähle @handle / Stimme für @handle / vote @handle          → o adaya oy (seçmen adada oturmalı)
 Seçmen başına tek oy; en son yazılan geçer. Sonuç: en çok oy, eşitlikte önce aday olan. Aday ya da oy
 yoksa seçim bir dönem (3 gün) uzar. Kazanana "belediye_baskani" mesleği verilir (sim: belediyede çalışır);
 dönemi biten ya da adadan ayrılan başkanın önceki mesleği geri gelir (overrides.eski_meslek).
@@ -56,10 +56,18 @@ CREATE TABLE IF NOT EXISTS secim_oylar (
 );
 """
 
-ADAY = re.compile(r"\b(?:im running|i am running|running for mayor|run for mayor|i want to be (?:the )?mayor"
-                  r"|i wanna be (?:the )?mayor|make me (?:the )?mayor|vote for me|mayor candidate|im a candidate"
-                  r"|(?:job|jobs) mayor|i choose mayor)\b")
-OY = re.compile(r"\bvot(?:e|es|ed|ing)\b")
+# Metin istekler.katla ile katlanır: ä → ae, umlautsuz yazım da (wahlt) geçer.
+_BM = r"b(?:ue|u)rgermeister(?:in)?"
+_ICH = r"ich (?:will|m(?:oe|o)chte|wuerde gerne?|wurde gerne?|waere gerne?|ware gerne?|waer gerne?|werde)(?: auch| gern| gerne)*"
+ADAY = re.compile(r"\b(?:ich kandidiere|kandidiere|ich trete an|trete an|ich stelle mich zur wahl|ich bin kandidat(?:in)?"
+                  r"|" + _ICH + r" (?:der |die |eure? )?" + _BM + r"|mach(?:t)? mich zu(?:m|r) " + _BM +
+                  r"|(?:beruf|job) " + _BM + r"|" + _BM + r" kandidat(?:ur|in)?|w(?:ae|a)hlt mich|stimmt fuer mich"
+                  r"|stimmt fur mich|vote for me|im running)\b")
+# Oy: @etiket ve oy sözcüğü. "Stimme" tek başına ses de demek ("tolle Stimme @x"): yalnız "Stimme: @x", "Stimme für",
+# "meine Stimme" ya da fiil olarak ("ich stimme für @x").
+OY = re.compile(r"\b(?:vot(?:e|es|ed|ing)|w(?:ae|a)hl(?:e|t|en)|gew(?:ae|a)hlt|meine stimme|stimm(?:e|en)? (?:fuer|fur|geht an|an)"
+                r"|abstimm\w*)\b")
+OY_HAM = re.compile(r"(?i)^\W*stimme\s*[:=]?\s*@|\bstimme\s*[:=]\s*@")
 ETIKET = re.compile(r"@([A-Za-z0-9._]{2,24})")
 
 
@@ -70,11 +78,12 @@ BIRAK = f"""UPDATE sakinler SET overrides = (overrides - 'meslek' - 'eski_meslek
 
 
 def cozumle(text: str) -> dict:
-    """{"aday": True} ya da {"oy": "kullaniciadi"}; ikisi de yoksa {}. Oy, @etiket ve "vote" kelimesi ister."""
+    """{"aday": True} ya da {"oy": "kullaniciadi"}; ikisi de yoksa {}. Oy, @etiket ve oy sözcüğü ister
+    ("Stimme: @x", "ich wähle @x"); "wählt mich" adaylıktır."""
     t = katla(text[:300])
     out = {}
     m = ETIKET.search(text)
-    if m and OY.search(t):
+    if m and (OY.search(t) or OY_HAM.search(text[:300])):
         out["oy"] = sim.normalize_handle(m.group(1).rstrip("."))
     elif ADAY.search(t):
         out["aday"] = True
@@ -90,7 +99,7 @@ def site_items(db: str = DB) -> list:
     if not r or not r.get("oylar"):
         return []
     items = [[f"site:{o['handle']}:{o['olusma']}", o["handle"], int(o["olusma"]) // 1000,
-              "I'm running" if o["tur"] == "aday" else f"vote: @{o['aday']}"] for o in r["oylar"]]
+              "ich kandidiere" if o["tur"] == "aday" else f"Stimme: @{o['aday']}"] for o in r["oylar"]]
     en_son = max(int(o["olusma"]) for o in r["oylar"])
     psql(f"""INSERT INTO durum (anahtar, deger) VALUES ('secim_site_son', '{{"ms": {en_son}}}')
              ON CONFLICT (anahtar) DO UPDATE SET deger = EXCLUDED.deger, updated_at = now();""", db)

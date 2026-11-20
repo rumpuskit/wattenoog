@@ -30,7 +30,7 @@ function cover(g, img, x, y, w, h) {
   g.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
 }
 
-/** Driftwood amblemi (mercan daire, güneş, dalga): sitedeki simgenin tuval hâli. */
+/** Wattenoog amblemi (mercan daire, güneş, dalga): sitedeki simgenin tuval hâli. */
 function emblem(g, cx, cy, r) {
   g.save();
   g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fillStyle = C.coral; g.fill(); g.clip();
@@ -62,7 +62,7 @@ export function residentCard(shot, info) {
   // Üst bant: amblem ve ad.
   roundRect(g, 48, 48, 430, 96, 48); g.fillStyle = "rgba(255,255,255,0.88)"; g.fill();
   emblem(g, 98, 96, 30);
-  fitText(g, "Driftwood Island", 144, 113, 320, 46, 900);
+  fitText(g, "Insel Wattenoog", 144, 113, 320, 46, 900);
   // Kart.
   const top = SH - 150;
   roundRect(g, 48, top, W - 96, 860, 44); g.fillStyle = "#ffffff"; g.fill();
@@ -85,8 +85,8 @@ export function residentCard(shot, info) {
   }
   // Alt: çağrı ve bağlantı.
   roundRect(g, 48, H - 250, W - 96, 190, 40); g.fillStyle = C.coral; g.fill();
-  fitText(g, "Move to the island too", W / 2, H - 165, W - 180, 54, 900, "#ffffff", "center");
-  fitText(g, `Follow @${TIKTOK} on TikTok`, W / 2, H - 108, W - 180, 34, 800, "#ffe3e9", "center");
+  fitText(g, "Zieh auch auf die Insel", W / 2, H - 165, W - 180, 54, 900, "#ffffff", "center");
+  fitText(g, `Folg @${TIKTOK} auf TikTok`, W / 2, H - 108, W - 180, 34, 800, "#ffe3e9", "center");
   fitText(g, info.link.replace(/^https?:\/\//, ""), W / 2, H - 22, W - 120, 30, 700, C.soft, "center");
   return cv;
 }
@@ -100,7 +100,7 @@ export function photoFrame(shot, caption) {
   g.drawImage(shot, 0, 0);
   g.fillStyle = C.paper; g.fillRect(0, H, W, band);
   emblem(g, band * 0.55, H + band / 2, band * 0.3);
-  fitText(g, "Driftwood", band * 1.0, H + band * 0.64, W * 0.4, band * 0.42, 900);
+  fitText(g, "Wattenoog", band * 1.0, H + band * 0.64, W * 0.4, band * 0.42, 900);
   fitText(g, `${caption} · ${SITE}`, W - band * 0.4, H + band * 0.62, W * 0.55, band * 0.3, 700, C.soft, "right");
   return cv;
 }

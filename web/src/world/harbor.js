@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { buildPort } from "./port.js";
 import { ferryOut } from "./ferry.js";
+import { tide } from "./gelgit.js";
 
 export function colored(geo, color) {
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -278,6 +279,129 @@ function boat(len, seed = 0) {
  * tekne (gövde hull() ile; karina boyası henüz yarım), iki katlı tüp iskele, üstte portal vinç ve
  * kancası, kereste yığını, boya varilleri, kaynak makinesi.
  */
+/**
+ * Krabbenkutter: koyu ahşap/çelik gövde, yüksek baş, öne yakın kaptan köşkü, ortada direk ve iki yana kaldırılmış ağ kolları
+ * (Ausleger, V biçiminde), kollardan sarkan ağlar; Kuzey Denizi karides teknesinin simgesi.
+ */
+function kutter(len, seed = 0) {
+  const PAL = [
+    { top: "#1f3f5f", stripe: "#f4f1ea", deck: "#8f6a49" },
+    { top: "#7a1f1f", stripe: "#f4f1ea", deck: "#9b7350" },
+    { top: "#2b4a35", stripe: "#f2d36b", deck: "#8f6a49" },
+    { top: "#f4f1ea", stripe: "#1f3f5f", deck: "#a77e57" },
+  ];
+  const pal = PAL[seed % PAL.length];
+  const beam = len * 0.3, depth = len * 0.13;
+  const H = hull(len, beam, depth, pal);
+  const parts = [H.geo];
+  const at = (s) => ({ z: H.z(s), y: H.deckY(s), w: H.deckW(s) });
+  // Kaptan köşkü: güvertenin ön-orta bölümünde (s 0.55…0.75), beyaz, koyu camlı.
+  const s0 = 0.55, s1 = 0.74, cw = Math.min(at(s0).w, at(s1).w) * 1.5, cz = (H.z(s0) + H.z(s1)) / 2, cl = H.z(s1) - H.z(s0), cy = Math.max(at(s0).y, at(s1).y), ch = len * 0.14;
+  parts.push(box(cw, ch, cl, 0, cy + ch / 2, cz, "#f6f4ee"), box(cw + 0.2, 0.08, cl + 0.3, 0, cy + ch + 0.04, cz, pal.top));
+  parts.push(box(cw + 0.02, ch * 0.3, cl * 0.82, 0, cy + ch * 0.7, cz, "#28323e"), box(cw * 0.86, ch * 0.3, 0.03, 0, cy + ch * 0.7, cz + cl / 2 + 0.01, "#28323e"));
+  // Direk ve iki ağ kolu: direğin dibinden iki yana yukarı açılmış (yaklaşık 60°), uçlarından sarkan ağ torbaları.
+  const m = at(0.42), mh = len * 0.62, base = new THREE.Vector3(0, m.y + 0.6, m.z);
+  parts.push(cyl(0.09, 0.12, mh, 0, m.y + mh / 2, m.z, "#d9d4c8", 6));
+  for (const side of [-1, 1]) {
+    const tip = new THREE.Vector3(side * len * 0.42, m.y + len * 0.62, m.z);
+    parts.push(rod(base, tip, 0.08, "#d9d4c8"));
+    parts.push(rod(new THREE.Vector3(0, m.y + mh, m.z), tip, 0.02, "#b9b4a8")); // vant
+    // Ağ: kolun ucundan aşağı sarkan dar torba (yeşil-mavi).
+    parts.push(colored(new THREE.ConeGeometry(0.45, 2.6, 6).rotateX(Math.PI).translate(tip.x * 0.92, tip.y - 1.6, tip.z), "#3f6f6a"));
+    parts.push(box(0.12, 0.12, 2.4, tip.x * 0.92, tip.y - 0.3, tip.z, "#5a5f66")); // kirişli ağ ağzı
+  }
+  parts.push(colored(new THREE.SphereGeometry(0.1, 8, 6).translate(0, m.y + mh + 0.06, m.z), "#fff3c4"));
+  // Kıçta vinç tamburu ve kasalar; kıç aynada tekne adı yerine kayıt numarası şeridi.
+  const a = at(0.12);
+  parts.push(colored(new THREE.CylinderGeometry(0.32, 0.32, Math.min(1.2, a.w * 1.4), 10).rotateZ(Math.PI / 2).translate(0, a.y + 0.5, a.z), "#c94f3a"));
+  for (const [dx, dz] of [[-0.4, 0.6], [0.4, 0.6], [0, 1.1]]) parts.push(box(0.55, 0.32, 0.42, dx * a.w, a.y + 0.16, a.z + dz, "#3e7fb0"));
+  for (const side of [-1, 1]) for (const s of [0.3, 0.6]) {
+    const w = H.halfW(s), y = H.sheer(s) * 0.5;
+    parts.push(cyl(0.12, 0.12, 0.42, side * (w + 0.12), y, H.z(s), "#2a2d33", 8)); // lastik usturmaça
+  }
+  const geo = mergeGeometries(parts.filter(Boolean).map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { if (g.attributes.uv) g.deleteAttribute("uv"); if (g.attributes.normal) g.deleteAttribute("normal"); return g; }));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, side: THREE.DoubleSide }));
+  mesh.castShadow = true;
+  return mesh;
+}
+
+/** Küstenwache teknesi: gri-beyaz gövde, kırmızı-sarı-siyah değil (amblem yok), mavi şerit, yüksek köşk, anten direği. */
+function patrol(len) {
+  const H = hull(len, len * 0.3, len * 0.12, { top: "#eef0f2", stripe: "#1f4f8f", deck: "#9aa3ab" });
+  const parts = [H.geo];
+  const at = (s) => ({ z: H.z(s), y: H.deckY(s), w: H.deckW(s) });
+  const s0 = 0.3, s1 = 0.62, cw = Math.min(at(s0).w, at(s1).w) * 1.6, cz = (H.z(s0) + H.z(s1)) / 2, cl = H.z(s1) - H.z(s0), cy = Math.max(at(s0).y, at(s1).y), ch = len * 0.16;
+  parts.push(box(cw, ch, cl, 0, cy + ch / 2, cz, "#f6f7f8"), box(cw + 0.02, ch * 0.32, cl * 0.85, 0, cy + ch * 0.7, cz, "#28323e"));
+  parts.push(box(cw + 0.1, 0.25, cl + 0.1, 0, cy + ch * 0.2, cz, "#1f4f8f"));
+  parts.push(cyl(0.05, 0.07, len * 0.35, 0, cy + ch + len * 0.17, cz, "#d9d4c8", 6));
+  const geo = mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { if (g.attributes.uv) g.deleteAttribute("uv"); if (g.attributes.normal) g.deleteAttribute("normal"); return g; }));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide }));
+  mesh.castShadow = true;
+  return mesh;
+}
+
+/** Mendirek: granit bloklu dalgakıran (deniz tabanından 2,3 m'ye), üstü düz taş yol, dış yanlarında iri kaya dolgusu (riprap). */
+function mole(f) {
+  const parts = [];
+  const w = f.x1 - f.x0, d = f.z1 - f.z0, cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, top = f.top;
+  parts.push(box(w, top + 4, d, cx, (top - 4) / 2, cz, "#8d9196")); // gövde
+  parts.push(box(w - 1.2, 0.12, d - 1.2, cx, top + 0.04, cz, "#b9bcbf")); // üst kaplama
+  for (const e of [-1, 1]) { // kenar taşları
+    if (w > d) parts.push(box(w, 0.3, 0.6, cx, top + 0.1, cz + e * (d / 2 - 0.3), "#a7aaae"));
+    else parts.push(box(0.6, 0.3, d, cx + e * (w / 2 - 0.3), top + 0.1, cz, "#a7aaae"));
+  }
+  // Riprap: uzun kenarlar boyunca, suyun içinden yükselen iri kayalar (sabit tohum).
+  const long = w > d, L = long ? w : d;
+  let sd = Math.round(cx * 7 + cz * 13) >>> 0;
+  const rnd = () => ((sd = (sd * 1103515245 + 12345) >>> 0) / 4294967296);
+  for (let t = 1.2; t < L - 1; t += 1.6) for (const e of [-1, 1]) {
+    const sc = 0.9 + rnd() * 0.9, off = (long ? d : w) / 2 + 0.6 + rnd() * 1.4;
+    const px = long ? f.x0 + t : cx + e * off, pz = long ? cz + e * off : f.z0 + t;
+    parts.push(colored(new THREE.IcosahedronGeometry(sc, 0).scale(1.3, 0.8, 1.1).rotateY(rnd() * 6).translate(px, -1.2 + rnd() * 1.3, pz), rnd() < 0.5 ? "#7f8489" : "#9a9ea2"));
+  }
+  const m = new THREE.Mesh(merged(parts.map((g) => (g.index ? g.toNonIndexed() : g))), MAT);
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+
+/** Molenfeuer: mendirek ucunda küçük liman feneri (giriş kırmızı/yeşil): beyaz şeritli kule, gece yanan fener odası. */
+function molenfeuer(f) {
+  const parts = [], y0 = 2.3;
+  parts.push(cyl(1.0, 1.15, 5.2, f.x, y0 + 2.6, f.z, f.c, 12), cyl(1.02, 1.02, 0.6, f.x, y0 + 3.4, f.z, "#f4f4f2", 12));
+  parts.push(cyl(1.35, 1.35, 0.14, f.x, y0 + 5.27, f.z, "#2a2d33", 12));
+  for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; parts.push(box(0.05, 0.6, 0.05, f.x + Math.cos(a) * 1.25, y0 + 5.65, f.z + Math.sin(a) * 1.25, "#2a2d33")); }
+  parts.push(cyl(0.6, 0.6, 0.9, f.x, y0 + 5.8, f.z, "#cfd6dc", 10), colored(new THREE.ConeGeometry(0.75, 0.6, 10).translate(f.x, y0 + 6.55, f.z), f.c));
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(merged(parts.map((q) => (q.index ? q.toNonIndexed() : q))), MAT);
+  m.castShadow = true;
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: f.c === "#c0392b" ? "#ff5a4a" : "#5aff8a" }));
+  lamp.position.set(f.x, y0 + 5.8, f.z);
+  lamp.userData.nightLamp = true;
+  g.add(m, lamp);
+  return g;
+}
+
+/** Seenotrettungskreuzer: turuncu-beyaz değil, kırmızı-beyaz gövde (kurtarma teknesi), yüksek köşk, kıçta yavru bot. */
+function rescueCruiser(len = 23) {
+  const H = hull(len, len * 0.27, len * 0.13, { top: "#f4f4f2", stripe: "#c0392b", deck: "#9aa3ab" });
+  const parts = [H.geo];
+  const at = (s) => ({ z: H.z(s), y: H.deckY(s), w: H.deckW(s) });
+  const s0 = 0.36, s1 = 0.7, cw = Math.min(at(s0).w, at(s1).w) * 1.55, cz = (H.z(s0) + H.z(s1)) / 2, cl = H.z(s1) - H.z(s0), cy = Math.max(at(s0).y, at(s1).y), ch = len * 0.11;
+  parts.push(box(cw, ch, cl, 0, cy + ch / 2, cz, "#f4f4f2"), box(cw * 0.8, ch * 0.9, cl * 0.55, 0, cy + ch * 1.45, cz + cl * 0.1, "#f4f4f2"));
+  parts.push(box(cw + 0.02, ch * 0.3, cl * 0.85, 0, cy + ch * 0.68, cz, "#28323e"), box(cw * 0.82, ch * 0.3, cl * 0.5, 0, cy + ch * 1.6, cz + cl * 0.1, "#28323e"));
+  parts.push(box(cw + 0.3, 0.35, cl + 0.3, 0, cy + 0.3, cz, "#c0392b"));
+  parts.push(cyl(0.08, 0.1, len * 0.35, 0, cy + ch * 1.9 + len * 0.17, cz + cl * 0.1, "#d9d4c8", 6));
+  const a = at(0.08); // kıçta yavru bot (Tochterboot) kızağı
+  parts.push(box(a.w * 1.2, 0.9, len * 0.22, 0, a.y + 0.45, a.z + len * 0.1, "#c0392b"));
+  const geo = mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { if (g.attributes.uv) g.deleteAttribute("uv"); if (g.attributes.normal) g.deleteAttribute("normal"); return g; }));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, side: THREE.DoubleSide }));
+  mesh.castShadow = true;
+  return mesh;
+}
+
 export function buildShipyard(world) {
   const S = world.tersane;
   const group = new THREE.Group();
@@ -427,8 +551,8 @@ export function buildFishingCove(world) {
   }
   for (const [rx, rz] of K.ropes) parts.push(colored(new THREE.TorusGeometry(0.22, 0.06, 5, 12).rotateX(Math.PI / 2).translate(rx, 1.58, rz), "#d9c38a"));
   for (let k = 0; k * 6 < K.jetty.z1 - K.jetty.z0; k++) for (const dx of [-1.15, 1.15]) parts.push(cyl(0.1, 0.12, 0.3, K.jetty.x + dx, 1.68, K.jetty.z0 + 3 + k * 6, "#2a2d33", 8));
-  // Dalgakıran: suya yığılmış iri taşlar.
-  {
+  // Dalgakıran: suya yığılmış iri taşlar (yalnız tanımlıysa; Wattenoog'da mendirekler ayrı).
+  if (K.rocks) {
     const [rx, rz] = K.rocks;
     for (let k = 0; k < 9; k++) {
       const a = k * 2.3, r = 1 + (k % 4) * 1.1, sc = 0.9 + (k % 3) * 0.4;
@@ -455,7 +579,7 @@ export function buildFishingCove(world) {
     const c = cv.getContext("2d");
     c.fillStyle = "#8a5a3a"; c.fillRect(0, 0, 512, 128);
     c.fillStyle = "#f4ead8"; c.font = "bold 60px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillText("FISHING WHARF", 256, 68);
+    c.fillText(K.kutter ? "KUTTERHAFEN" : "FISHING WHARF", 256, 68);
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     const board = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.65, 0.08), [MATW, MATW, MATW, MATW, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }), MATW]);
@@ -491,12 +615,21 @@ export function buildHarbor(world) {
     if (f.type === "iskele" && vapur && Math.abs(vapur.x - 7.2 - f.x) < f.w / 2 + 4.5 && vapur.z - 4 > f.z && vapur.z - 4 < f.z + f.len) {
       kopru = { side: Math.sign(vapur.x - f.x) || 1, z: vapur.z - 4 - f.z, half: 1.35 };
     }
-    if (f.type === "iskele") group.add(pier(f, 1.53, kopru));
+    if (f.type === "iskele") group.add(pier(f, f.ponton ? 1.4 : 1.53, kopru));
+    else if (f.type === "mendirek") group.add(mole(f));
+    else if (f.type === "molenfeuer") group.add(molenfeuer(f));
+    else if (f.type === "rettungskreuzer") {
+      const m = rescueCruiser();
+      m.position.set(f.x, 0.1, f.z);
+      m.rotation.y = f.rot ?? 0;
+      group.add(m);
+      floating.push({ obj: m, base: 0.1, amp: 0.05, roll: 0.02, ph: 1.1, rot: f.rot ?? 0, bed: world.height(f.x, f.z) + 1.2 });
+    }
     else if (f.type === "vapur") {
       const m = ferry();
       m.position.set(f.x, 0.2, f.z);
       group.add(m);
-      floating.push({ obj: m, base: 0.2, amp: 0.06, roll: 0.006, ph: 0.3 });
+      floating.push({ obj: m, base: 0.2, amp: 0.06, roll: 0.006, ph: 0.3, bed: -99 });
       ferryObj = { obj: m, x: f.x, z: f.z };
       world.vapur3d = m; // olay-vapur.js: güverte yolcuları vapurun çocuğu olarak eklenir
       // İskele köprüsü (vapurdan iskeleye).
@@ -513,11 +646,12 @@ export function buildHarbor(world) {
       ferryPlank = plank;
     } else if (f.type === "tekne") {
       const len = f.len ?? 8;
-      const m = boat(len, Math.round(Math.abs(f.x * 7 + f.z * 3)));
+      const m = f.kutter ? kutter(len, Math.round(Math.abs(f.x * 7 + f.z * 3))) : f.kuestenwache ? patrol(len) : boat(len, Math.round(Math.abs(f.x * 7 + f.z * 3)));
       m.position.set(f.x, 0.05, f.z);
       m.rotation.y = f.rot ?? 0;
       group.add(m);
-      floating.push({ obj: m, base: 0.05, amp: 0.08 + 0.02 * (10 - Math.min(10, len)), roll: 0.04, ph: f.x * 0.13 + f.z * 0.07, rot: f.rot ?? 0 });
+      // Gelgit: tekne suyla iner kalkar; su tabanın (draft) altına inince çamura oturur (sallanmaz, hafif yatar).
+      floating.push({ obj: m, base: 0.05, amp: 0.08 + 0.02 * (10 - Math.min(10, len)), roll: 0.04, ph: f.x * 0.13 + f.z * 0.07, rot: f.rot ?? 0, bed: world.height(f.x, f.z) + len * 0.06 });
     }
   }
   const port = world.port ? buildPort(world) : null;
@@ -542,16 +676,27 @@ export function buildHarbor(world) {
     const u = ferryOut(m);
     o.visible = u < 0.98;
     if (ferryPlank) ferryPlank.visible = u < 0.02; // vapur yokken iskele köprüsü kaldırılmış
-    o.position.x = ferryObj.x + 26 * u * u;
-    o.position.z = ferryObj.z + 160 * u;
-    o.rotation.y = -0.5 * Math.sin(Math.PI * Math.min(1, u * 1.6)) * (u < 1 ? 1 : 0);
+    // Rota: world.ferryRun (Wattenoog: havuz ağzından düz güneye, dönmeden); yoksa açığa dönerek.
+    const run = world.ferryRun;
+    o.position.x = ferryObj.x + (run ? run.dx : 26) * u * u;
+    o.position.z = ferryObj.z + (run ? run.dz : 160) * u;
+    o.rotation.y = run ? 0 : -0.5 * Math.sin(Math.PI * Math.min(1, u * 1.6)) * (u < 1 ? 1 : 0);
   };
   group.userData.tick = (t) => {
     port?.userData.tick(globalThis.__portT ?? t); // __portT: denetimde belirli bir anı görmek için
+    const lv = tide();
     for (const b of floating) {
-      b.obj.position.y = b.base + Math.sin(t * 0.9 + b.ph) * b.amp;
-      b.obj.rotation.z = Math.sin(t * 0.7 + b.ph * 1.7) * b.roll;
-      b.obj.rotation.x = Math.sin(t * 0.55 + b.ph) * b.roll * 0.5;
+      const water = lv + b.base, ground = (b.bed ?? -99) + b.base;
+      if (water <= ground) { // kurumuş: çamurda yatık
+        b.obj.position.y = ground;
+        b.obj.rotation.z = 0.09 * Math.sign(Math.sin(b.ph * 7.1) || 1);
+        b.obj.rotation.x = 0.02;
+        continue;
+      }
+      const k = Math.min(1, (water - ground) / 0.4); // sığda sallantı söner
+      b.obj.position.y = water + Math.sin(t * 0.9 + b.ph) * b.amp * k;
+      b.obj.rotation.z = Math.sin(t * 0.7 + b.ph * 1.7) * b.roll * k;
+      b.obj.rotation.x = Math.sin(t * 0.55 + b.ph) * b.roll * 0.5 * k;
     }
   };
   return group;

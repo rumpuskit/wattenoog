@@ -100,7 +100,7 @@ function porchOf(b) {
   switch (b.house) {
     case "friesenhaus": return { pumpkins: [[-0.95, front + 1.0], [1.0, front + 1.1]], deck: 0.45, flag: [1.0, front + 1.25, 2.3] };
     case "doppelhaus": return { pumpkins: [[-b.w / 2 + 0.7, front + 1.6], [-b.w / 2 + 1.3, front + 1.9], [b.w / 2 - 0.8, front + 1.6]], deck: 0.5, flag: [b.w / 2 - 0.2, front + 2.25, 2.6] };
-    case "reihenhaus": return { pumpkins: [[-1.6, front + 1.5], [1.6, front + 1.5], [-b.w / 2 + 0.8, front + 2.0]], deck: 0.5, flag: [b.w / 2 - 0.2, front + 2.45, 2.6] };
+    case "kapitaenshaus": return { pumpkins: [[-1.6, front + 1.5], [1.6, front + 1.5], [-b.w / 2 + 0.8, front + 2.0]], deck: 0.5, flag: [b.w / 2 - 0.2, front + 2.45, 2.6] };
     default: return { pumpkins: [[-1.9, front + 1.2], [1.9, front + 1.2]], deck: 0.1, flag: null };
   }
 }

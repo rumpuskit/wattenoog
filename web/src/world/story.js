@@ -6,34 +6,39 @@ import { prefOf } from "../tercih.js";
 import * as sim from "../sim.js";
 import { clockText, dateText } from "../fmt.js";
 
-// Anahtarlar katalogdaki evcil türleri (evcil_hayvanlar).
+// Anahtarlar katalogdaki evcil türleri (evcil_hayvanlar). Görünen metinler Almanca; özellikler ve olaylar
+// cinsiyetsiz (sıfat ya da zamirsiz cümle; DEVIR §4.2).
 const PET_NAMES = {
-  Cat: ["Luna", "Pepper", "Mittens", "Oliver", "Cleo", "Biscuit", "Smokey", "Ginger"],
-  Dog: ["Max", "Bailey", "Scout", "Daisy", "Cooper", "Rosie", "Buster", "Maple"],
-  Parrot: ["Captain", "Kiwi", "Sunny", "Polly"],
-  Turtle: ["Shelly", "Tank", "Pickles", "Mr. Slow"],
+  Katze: ["Mila", "Minka", "Socke", "Luna", "Felix", "Tiger", "Smilla", "Momo"],
+  Hund: ["Bruno", "Paul", "Frieda", "Balu", "Lotte", "Kalle", "Hein", "Emma"],
+  Kaninchen: ["Krümel", "Hoppel", "Flocke", "Wuschel", "Pünktchen", "Möhre"],
+  Wellensittich: ["Pieps", "Hansi", "Kiwi", "Fiete"],
 };
 
 const HOBBY_TRAIT = {
-  balik: "Patient", kitap: "Bookworm", satranc: "Strategist", resim: "Artistic", bisiklet: "Sporty",
-  yuzme: "Ocean lover", ucurtma: "Young at heart", gitar: "Music lover", fotograf: "Keen observer", kosu: "Sporty",
-  cornhole: "Competitive", yoga: "Calm seeker", mangal: "Backyard chef",
+  balik: "Geduldig", kitap: "Leseratte", satranc: "Kartenprofi", schach: "Denkt drei Züge voraus", resim: "Kreativ",
+  bisiklet: "Sportlich", yuzme: "Wasserratte", ucurtma: "Jung geblieben", gitar: "Singt gern", fotograf: "Gutes Auge",
+  kosu: "Sportlich", bosseln: "Ehrgeizig", yoga: "Ruhepol", mangal: "Grillprofi", watt: "Kennt die Gezeiten", kite: "Abenteuerlustig",
 };
 const JOB_TRAIT = {
-  doktor: "Helpful", hemsire: "Caring", ogretmen: "Patient explainer", yazilimci: "Tech enthusiast",
-  tasarimci: "Eye for detail", avukat: "Quick-witted", mimar: "Planner", barista: "Friendly", garson: "Friendly",
-  asci: "Foodie", firinci: "Early bird", balikci: "Early bird", cankurtaran: "Brave", rehber: "Chatty",
-  fener_bekcisi: "Loves solitude", bahcivan: "Nature lover", ciftci: "Down to earth", kutuphaneci: "Bookworm",
-  seramikci: "Handy", marangoz: "Handy", yelkenci: "Handy", ressam: "Artistic", muhasebeci: "Meticulous", memur: "Organized",
-  liman_iscisi: "Hard worker", gemi_ustasi: "Craftsman", kasiyer: "Punctual", resepsiyonist: "Polite",
-  kahveci: "Early bird", lunapark: "Fun-loving", polis: "Fair-minded", futbolcu: "Team player",
-  anakara: "Ferry regular", ogrenci: "Eager learner", uzaktan: "Independent", emekli: "Seen it all",
+  doktor: "Hilfsbereit", hemsire: "Fürsorglich", ogretmen: "Erklärt gern", yazilimci: "Technikfan",
+  tasarimci: "Blick fürs Detail", avukat: "Schlagfertig", mimar: "Plant gern", barista: "Freundlich", garson: "Freundlich",
+  asci: "Isst gern gut", firinci: "Steht früh auf", balikci: "Steht früh auf", cankurtaran: "Mutig", rehber: "Gesprächig",
+  fener_bekcisi: "Mag die Ruhe", bahcivan: "Naturverbunden", ciftci: "Bodenständig", kutuphaneci: "Leseratte",
+  seramikci: "Geschickt", marangoz: "Geschickt", yelkenci: "Geschickt", ressam: "Kreativ", muhasebeci: "Genau", memur: "Ordentlich",
+  liman_iscisi: "Packt an", gemi_ustasi: "Handwerklich begabt", kasiyer: "Pünktlich", resepsiyonist: "Höflich",
+  kahveci: "Steht früh auf", lunapark: "Gesellig", polis: "Gerecht", futbolcu: "Teamgeist",
+  anakara: "Pendelt täglich", ogrenci: "Wissbegierig", uzaktan: "Unabhängig", emekli: "Hat schon alles gesehen",
+  deichschaefer: "Naturverbunden", strandkorbmacher: "Geschickt", bernstein: "Geduldig", lokfuehrer: "Pünktlich",
+  seenotretter: "Mutig", itfaiyeci: "Mutig", sofor: "Pünktlich", hakem: "Gerecht", pazarci: "Gesprächig", eczaci: "Hilfsbereit",
+  berber: "Gesprächig", sahil_guvenlik: "Wachsam", veteriner: "Tierlieb", hakim: "Gerecht", savci: "Hartnäckig",
+  muhtar: "Kennt alle", okul_muduru: "Organisiert", belediye_baskani: "Kennt alle", zeplin_pilotu: "Schwindelfrei",
 };
-const EXTRA_TRAITS = ["Funny", "Social butterfly", "Easygoing", "Nostalgic", "Curious", "Punctual", "Daydreamer", "Generous", "Tea lover", "Coffee lover"];
+const EXTRA_TRAITS = ["Lustig", "Gesellig", "Gelassen", "Nostalgisch", "Neugierig", "Pünktlich", "Verträumt", "Großzügig", "Ostfriesentee-Fan", "Kaffee-Fan"];
 
 const dateOf = dateText;
-// Adını gizleyen sakin hikâyelerde de "Private neighbor" olarak geçer.
-const atOf = (r) => (r.hidden ? "Private neighbor" : "@" + r.handle);
+// Adını gizleyen sakin hikâyelerde de "Name verborgen" olarak geçer.
+const atOf = (r) => (r.hidden ? "Name verborgen" : "@" + r.handle);
 
 export class Stories {
   constructor(people) {
@@ -73,15 +78,15 @@ export class Stories {
     add(HOBBY_TRAIT[p.hobbies[i].id]);
     add(JOB_TRAIT[p.works[i].job]);
     const day = p.day;
-    if (sim.pet(r, day)) add("Animal lover");
+    if (sim.pet(r, day)) add("Tierlieb");
     const plan = p.plans?.[i];
     if (plan) {
       // Erkenci: sabah erken uyanan (gece vardiyasından dönenler sayılmaz).
       const wake = plan[0]?.ne === "uyku" ? plan[0].son : 420;
-      if (wake < 390) add("Early bird");
-      if (plan[0]?.ne === "is") add("Night owl");
+      if (wake < 390) add("Steht früh auf");
+      if (plan[0]?.ne === "is") add("Nachteule");
       const sleep = plan.findLast((s) => s.ne === "uyku")?.bas ?? 1380;
-      if (sleep > 1400) add("Night owl");
+      if (sleep > 1400) add("Nachteule");
     }
     add(EXTRA_TRAITS[sim.roll(r.seed, "huy") % EXTRA_TRAITS.length]);
     return out.slice(0, 4);
@@ -91,7 +96,7 @@ export class Stories {
     const r = this.people.residents[i];
     const kind = sim.pet(r, this.people.day);
     if (!kind) return null;
-    const names = PET_NAMES[kind] ?? ["Buddy"];
+    const names = PET_NAMES[kind] ?? ["Krümel"];
     // Doğrulanmış sakin evcilinin adını seçebilir (tercih.js).
     return { kind, name: prefOf(r.handle)?.evcil_ad ?? names[sim.roll(r.seed, "evcilAd") % names.length] };
   }
@@ -121,27 +126,28 @@ export class Stories {
     const r = p.residents[i];
     const today = p.day;
     const events = [];
-    events.push({ day: r.arrived_day, text: `Came over on the ferry and moved into ${sim.streetAddress(r.slot)}.` });
+    events.push({ day: r.arrived_day, text: `Mit der Fähre gekommen und eingezogen: ${sim.streetAddress(r.slot)}.` });
     const job = sim.job(r);
-    const startText = { emekli: "Started enjoying retirement on the island.", uzaktan: "Turned a corner of the home into an office and works remotely from the island.", anakara: "Started taking the ferry to a job on the mainland.", ogrenci: "Started taking the ferry to college on the mainland." }[job.id] ?? `Started work at ${p.works[i].loc.name}.`;
+    const startText = { emekli: "Genießt seitdem den Ruhestand auf der Insel.", uzaktan: "Eine Ecke der Wohnung ist jetzt Büro: Homeoffice mit Inselblick.", anakara: "Pendelt seitdem mit der Fähre zur Arbeit aufs Festland.", ogrenci: "Pendelt seitdem mit der Fähre zum Studium aufs Festland." }[job.id] ?? `Erster Arbeitstag: ${p.works[i].loc.name}.`;
     events.push({ day: r.arrived_day + 1, text: startText });
     // Terfiler: kıdem eşikleri (emeklilerde yok).
     for (let day = r.arrived_day + 1; !job.calismaz && day <= today; day++) {
       const before = sim.rank(r, day - 1), now = sim.rank(r, day);
-      if (now > before) events.push({ day, text: `Got promoted to ${job.kademeler[Math.min(now, job.kademeler.length - 1)]}.` });
+      // Unvan sim.title ile: kişi biçim seçmediyse iş alanı + kademe ("Krabbenfischerei (Leitung)"), cinsiyet tahmini yok.
+      if (now > before) events.push({ day, text: `Befördert, jetzt: ${sim.title(r, day)}.` });
     }
     const pet = this.petName(i);
     if (pet) {
       const adopt = r.arrived_day + 5 + (sim.roll(r.seed, "evcil_gun") % 25);
-      if (adopt <= today) events.push({ day: adopt, text: `Adopted a ${pet.kind.toLowerCase()} named ${pet.name}.` });
+      if (adopt <= today) events.push({ day: adopt, text: `Neues Haustier: ${pet.kind} ${pet.name}.` });
     }
     const f = this.friend[i];
     if (f >= 0) {
       const met = Math.max(r.arrived_day, p.residents[f].arrived_day) + 1 + (sim.roll(r.seed ^ p.residents[f].seed, "tanisma") % 9);
-      if (met <= today) events.push({ day: met, text: `Met ${atOf(p.residents[f])} through ${p.hobbies[i].ad.toLowerCase()}; best friends ever since.` });
+      if (met <= today) events.push({ day: met, text: `${atOf(p.residents[f])} beim ${p.hobbies[i].ad} kennengelernt; seitdem unzertrennlich.` });
     }
     const first = r.arrived_day + 2 + (sim.roll(r.seed, "ilkHobi") % 5);
-    if (first <= today) events.push({ day: first, text: `Tried ${p.hobbies[i].ad.toLowerCase()} on the island for the first time.` });
+    if (first <= today) events.push({ day: first, text: `Zum ersten Mal auf der Insel: ${p.hobbies[i].ad}.` });
     return events.filter((e) => e.day <= today).sort((a, b) => b.day - a.day).map((e) => ({ ...e, date: dateOf(e.day) }));
   }
 
@@ -153,23 +159,23 @@ export class Stories {
     const f = this.friend[i];
     plan.forEach((seg, k) => {
       const at = clockText(seg.bas);
-      if (seg.ne === "uyku") { if (k > 0) out.push([at, "Sleep"]); return; }
+      if (seg.ne === "uyku") { if (k > 0) out.push([at, "Schlafen"]); return; }
       if (seg.ne === "ev") { out.push([at, homeLabel(k)]); return; }
       if (seg.ne === "yol") {
         const trip = p.tripStore?.[i]?.get(k) ?? p._trip(i, seg, k);
-        const how = { araba: "by car", otobus: "by bus", taksi: "by taxi", yaya: "on foot" }[trip?.mode];
+        const how = { araba: "mit dem Auto", otobus: "mit dem Bus", taksi: "mit dem Taxi", yaya: "zu Fuß" }[trip?.mode];
         // Dışarı çıkışta gidilen gerçek yer (etkinliğin yeri), plandaki genel "meydan" değil.
         const to = seg.nereye === "meydan" || seg.nereye.startsWith("hobi:") ? p._placeOf(i, k + 1) ?? seg.nereye : seg.nereye;
-        const dest = to === "ev" ? "Heading home" : `To ${placeLabel(to)}`;
+        const dest = to === "ev" ? "Nach Hause" : `Unterwegs → ${placeLabel(to)}`;
         out.push([at, how ? `${dest} · ${how}` : dest]);
         return;
       }
-      if (seg.ne === "is") { out.push([at, `At work · ${p.works[i].loc.name}`]); return; }
-      const withFriend = f >= 0 && p.plans[f]?.some((q) => q.yer === seg.yer && q.bas < seg.son && q.son > seg.bas) ? ` (with ${atOf(p.residents[f])})` : "";
+      if (seg.ne === "is") { out.push([at, `Bei der Arbeit · ${p.works[i].loc.name}`]); return; }
+      const withFriend = f >= 0 && p.plans[f]?.some((q) => q.yer === seg.yer && q.bas < seg.son && q.son > seg.bas) ? ` (mit ${atOf(p.residents[f])})` : "";
       const act = p.acts?.[i]?.get(k);
       if (act && ETKINLIK[act]) out.push([at, `${ETKINLIK[act].ad}${withFriend}`]);
       else if (seg.ne === "hobi") out.push([at, `${p.hobbies[i].ad} · ${placeLabel(seg.yer)}${withFriend}`]);
-      else if (seg.ne === "meydan") out.push([at, `Out · ${placeLabel(p._placeOf(i, k) ?? "meydan")}${withFriend}`]);
+      else if (seg.ne === "meydan") out.push([at, `Draußen · ${placeLabel(p._placeOf(i, k) ?? "meydan")}${withFriend}`]);
     });
     return out;
   }

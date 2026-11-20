@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Adadan çıkmak isteyeni (DM ile bildirir) hemen çıkarır ve bir daha taşınmamasını sağlar.
+"""Adadan çıkmak isteyeni (DM ile ya da yorumda "zieh mich aus" / "lösch mich" yazar: istekler.py `cikis` olarak
+kaydeder, `istekler.py liste --tur cikis` gösterir) hemen çıkarır ve bir daha taşınmamasını sağlar.
 
 Kullanım:
     python3 cikar.py kullaniciadi
@@ -7,7 +8,7 @@ Kullanım:
     python3 cikar.py --gizle kullaniciadi       # adada kalır, adı görünmez ("gizli komşu")
     python3 cikar.py --goster kullaniciadi      # adı yeniden görünür
 
-Kullanıcı adının kendisi saklanmaz; çıkma listesinde yalnız sha256 özeti durur.
+Kullanıcı adının kendisi saklanmaz; çıkma listesinde yalnız sha256 özeti durur. İstekleri ve katılım kaydı da silinir.
 """
 
 import argparse
@@ -46,6 +47,7 @@ def main() -> None:
     removed = psql(f"""
         INSERT INTO cikanlar (ozet, day) VALUES ('{ozet}', {day}) ON CONFLICT DO NOTHING;
         DELETE FROM istekler WHERE handle = :'h';
+        DELETE FROM katilim WHERE handle = :'h';
         WITH d AS (DELETE FROM sakinler WHERE platform = :'pf' AND handle = :'h' RETURNING 1) SELECT count(*) FROM d;
     """, args.db, ["-v", f"pf={PLATFORM}", "-v", f"h={handle}"])
     # Sitedeki tercihleri, oturumu ve oyları da (Worker).

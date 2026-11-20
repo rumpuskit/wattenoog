@@ -384,6 +384,30 @@ export function brickPaving() {
   }));
 }
 
+/** Klinker döşeme (Strandstraße, Hafenkante, Promenade): koyu derzli balıksırtı (Fischgrätverband), kırmızı-kahve
+ * tonlar; her tuğlanın tonu ayrı (eski kuzey klinkeri). */
+export function klinkerPaving() {
+  return (cache.klinkerPaving ??= canvasTexture(256, (ctx, sz) => {
+    const rand = rng("klinker-doseme");
+    ctx.fillStyle = "#5a4038";
+    ctx.fillRect(0, 0, sz, sz);
+    const u = sz / 16; // tuğla 2u × u
+    const brick = (x, y, w, h) => {
+      const v = rand(), t = rand();
+      const r = 128 + Math.floor(v * 40), g = 58 + Math.floor(v * 22 + t * 8), b = 44 + Math.floor(v * 14);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    };
+    // Balıksırtı: her 2u'luk karede bir yatay ve bir dikey tuğla, satırdan satıra u kayarak (90° desen).
+    for (let j = -2; j < 18; j++) for (let i = -2; i < 18; i += 2) {
+      const x = (i + (j % 2 ? 1 : 0)) * u, y = j * u;
+      brick(x, y, 2 * u, u);
+      brick(x + 2 * u, y - u, u, 2 * u);
+    }
+    speckle(ctx, sz, rand, 3500, ["rgba(0,0,0,0.10)", "rgba(255,230,210,0.05)"], 1.2);
+  }));
+}
+
 /** Biçilmiş çim (Town Green): açık ve koyu biçme şeritleri, ince çim lekesi. Alana bir kez gerilir. */
 export function lawn() {
   return (cache.lawn ??= canvasTexture(512, (ctx, s) => {

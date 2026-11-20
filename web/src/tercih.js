@@ -9,18 +9,18 @@ export const SECENEK = {
   koltuk: ["#7a8fb8", "#c96f62", "#6f9a72", "#d9a441", "#8a6fb0", "#4f5560"],
   perde: ["#ffffff", "#f2c9cf", "#cfe3f2", "#f5e3a8", "#c9e4c5", "#e0d2f0"],
   cicek: ["yok", "sardunya", "lavanta", "papatya", "begonvil", "kaktus"],
-  evcil_ad: ["Biscuit", "Luna", "Max", "Pepper", "Scout", "Maple", "Captain", "Pickles", "Daisy", "Cooper", "Bailey", "Rosie",
-    "Buddy", "Ginger", "Oliver", "Mittens", "Sunny", "Peanut", "Shadow", "Cocoa", "Penny", "Tucker", "Willow", "Murphy",
-    "Hazel", "Skipper", "Clover", "Gus", "Marley", "Waffles"],
+  evcil_ad: ["Mila", "Paul", "Luna", "Bruno", "Frieda", "Krümel", "Lotte", "Momo", "Smilla", "Kalle", "Hein", "Fiete",
+    "Ella", "Socke", "Emma", "Moritz", "Pünktchen", "Jette", "Matti", "Flocke", "Ole", "Tilda", "Kasimir", "Wilma",
+    "Pepe", "Nala", "Knut", "Lilli", "Balu", "Wuschel"],
   etkinlik: ["piknik", "tepe_yuruyus", "plaj_yuruyus", "kosu", "gun_batimi", "vapur", "kiyi_balik", "kapi_onu", "yildiz",
-    "kahvehane", "kafe", "carsi", "ucurtma", "fotograf", "tas", "meydan_sohbet"],
+    "kahvehane", "kafe", "carsi", "ucurtma", "fotograf", "tas", "meydan_sohbet", "deich_spaziergang", "watt_yuruyus"],
 };
-export const CICEK_AD = { yok: "None", sardunya: "Geraniums", lavanta: "Lavender", papatya: "Daisies", begonvil: "Petunias", kaktus: "Succulents" };
+export const CICEK_AD = { yok: "Keine", sardunya: "Geranien", lavanta: "Lavendel", papatya: "Margeriten", begonvil: "Petunien", kaktus: "Sukkulenten" };
 const CICEK_RENK = { sardunya: ["#d8343f", "#e85a64"], lavanta: ["#8e6fc9", "#a98bd9"], papatya: ["#ffffff", "#f6d24a"], begonvil: ["#d6328f", "#e85aa8"], kaktus: ["#4f8a4a", "#6aa35e"] };
-export const TEMA_SECENEK = ["ucurtma", "gunbatimi", "balik", "temizlik", "yildiz", "tavla", "komsuluk"];
-export const TEMA_AD = { ucurtma: "Kite day", gunbatimi: "Bonfire night", balik: "Lobster bake", temizlik: "Beach cleanup", yildiz: "Stargazing night", tavla: "Trivia night at the Diner", komsuluk: "Block party" };
+export const TEMA_SECENEK = ["wattwanderung", "bosseln", "kutter", "klonschnack", "gunbatimi", "yildiz", "ucurtma", "temizlik", "sandburg", "komsuluk"];
+export const TEMA_AD = { wattwanderung: "Wattwanderung", bosseln: "Boßelturnier", kutter: "Krabbenkutter am Hafen", klonschnack: "Klönschnack an der Fischbude", gunbatimi: "Sonnenuntergang an der Promenade", yildiz: "Sternegucken", ucurtma: "Drachensteigen", temizlik: "Strandputz", sandburg: "Sandburgen-Wettbewerb", komsuluk: "Straßenfest" };
 export const FILM_SECENEK = ["komedi", "macera", "korku", "animasyon"];
-export const FILM_AD = { komedi: "Comedy", macera: "Adventure", korku: "Classic", animasyon: "Animation" };
+export const FILM_AD = { komedi: "Komödie", macera: "Abenteuer", korku: "Klassiker", animasyon: "Zeichentrick" };
 
 let byHandle = {}, bySlot = new Map(), themeVotes = {}, filmVotes = {};
 
@@ -32,7 +32,7 @@ export function setPrefs(data, residents) {
 export const prefFor = (slot) => bySlot.get(slot) ?? null;
 export const prefOf = (handle) => (handle ? byHandle[handle] ?? null : null);
 
-/** Gün numarası (Türkiye takvimi, sim.dayOf) → "YYYY-AA-GG". */
+/** Gün numarası (ada takvimi, Berlin; sim.dayOf) → "YYYY-AA-GG". */
 export const dateKey = (day) => new Date(day * 86400000).toISOString().slice(0, 10);
 /** ISO hafta: "YYYY-Www" (film anketi). */
 export function weekKey(day) {

@@ -129,6 +129,6 @@ export default {
       const stub = env.PRESENCE.get(env.PRESENCE.idFromName("ada"));
       return stub.fetch(request);
     }
-    return new Response("Driftwood Island online counter", { headers: { "content-type": "text/plain; charset=utf-8" } });
+    return new Response("Insel Wattenoog: Online-Zähler", { headers: { "content-type": "text/plain; charset=utf-8" } });
   },
 };

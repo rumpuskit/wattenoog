@@ -157,7 +157,7 @@ def sokak_name(mahalle: int, sokak: int) -> str:
     names, ekler = catalog()["sokaklar"], catalog()["sokak_ekleri"]
     g = (mahalle % cap("mahalle_per_ada")) * cap("sokak_per_mahalle") + sokak
     n = g % len(names)
-    return f"{names[n]} {ekler[(g // len(names) + n) % len(ekler)]}"
+    return f"{names[n]}{ekler[(g // len(names) + n) % len(ekler)]}"
 
 
 def housing_of(mahalle: int) -> dict:
@@ -174,7 +174,7 @@ def house_of(slot: int) -> dict:
 
 def street_address(slot: int) -> str:
     p, h = address_parts(slot), house_of(slot)
-    return f"{h['ev'] + 1} {sokak_name(p['mahalle'], p['sokak'])}" + (f", Apt {h['apt']}" if h["apt"] else "")
+    return f"{sokak_name(p['mahalle'], p['sokak'])} {h['ev'] + 1}" + (f", Whg. {h['apt']}" if h["apt"] else "")
 
 
 def address_text(slot: int) -> str:
@@ -300,9 +300,17 @@ def rank(r: dict, day: int) -> int:
     return sum(1 for threshold in catalog()["terfi_gunleri"] if t >= int(threshold) + shift)
 
 
+STUFE = ["Ausbildung", "", "erfahren", "Leitung"]
+
+
 def title(r: dict, day: int) -> str:
-    ladder = job(r)["kademeler"]
-    return ladder[min(rank(r, day), len(ladder) - 1)]
+    """Görünen meslek: seçilmiş biçimde (overrides.form m/w) unvan, yoksa iş alanı + kademe (sim.js ile aynı)."""
+    j, k, form = job(r), rank(r, day), _override(r, "form")
+    ladder = (j.get("kademeler_w") or j["kademeler"]) if form == "w" else j["kademeler"] if form == "m" else None
+    if ladder:
+        return ladder[min(k, len(ladder) - 1)]
+    s = STUFE[min(k, len(STUFE) - 1)] if len(j["kademeler"]) > 1 and j.get("stufen", True) is not False else ""
+    return f"{j['alan']} ({s})" if s else j["alan"]
 
 
 def hobby(r: dict) -> dict:

@@ -4,6 +4,7 @@ import catalog from "../../data/catalog.json";
 import * as sim from "./sim.js";
 import { World } from "./world/layout.js";
 import { buildTerrain, buildWater } from "./world/terrain.js";
+import { setTide, tideLevel } from "./world/gelgit.js";
 import { buildGrounds, buildRoads } from "./world/roads.js";
 import { buildCity, buildSites } from "./world/city.js";
 import { buildClouds, buildTrees, driftClouds, fadeTrees } from "./world/nature.js";
@@ -33,6 +34,7 @@ import { clockText, plural } from "./fmt.js";
 import { Zeplin } from "./world/zeplin.js";
 import { api } from "./api.js";
 import { buildFlowers, curtain, dateKey, setPrefs, setVotes, weekKey } from "./tercih.js";
+import { fixedTheme } from "./world/etkinlik.js";
 import { buildHidden } from "./world/sakli.js";
 import { createMenu } from "./menu.js";
 import { createTour } from "./tur.js";
@@ -56,13 +58,15 @@ function progress(f, text) {
 }
 // Ağır kurulum adımları arasında tarayıcıya bir kare çizdirir (çubuk ilerlesin).
 const paint = () => new Promise((ok) => requestAnimationFrame(() => setTimeout(ok, 0)));
+const saatler = TASINMA_SAATLERI.map(String);
 const TIPS = [
-  `Move-ins three times a day: ${TASINMA_SAATLERI.map(hourText).join(", ")} (ET). Follow on TikTok and you move in at the next one.`,
-  "Type your @username in the search below to see your home and your day.",
-  "Tap a resident and the camera follows them. \"Over the shoulder\" walks right behind them.",
-  "Comment \"job: fisherman\" on one of our videos and you become a fisherman at the next move-in.",
-  "New places open as residents arrive: the Diner, the Bakery, the school, the freight terminal…",
-  `Island time is Eastern Time: lights come on after sunset and the first ferry docks at ${clockText(FERRY.first)}.`,
+  `Einzug dreimal täglich: ${saatler.slice(0, -1).join(", ")} und ${hourText(saatler.at(-1))}. Folg uns auf TikTok, dann ziehst du beim nächsten Einzug ein.`,
+  "Du folgst schon länger? Schreib „einziehen“ unter ein Video, dann bekommst du ein Haus.",
+  "Gib deinen @Namen in die Suche ein, dann siehst du dein Zuhause und deinen Tag.",
+  "Tipp jemanden auf der Insel an, und die Kamera folgt. „Über die Schulter“ geht direkt hinterher.",
+  "Schreib „Beruf: Fischerei“ unter eines unserer Videos, dann arbeitest du ab dem nächsten Einzug in der Fischerei.",
+  "Neue Orte öffnen, wenn Einwohner dazukommen: Fischbude, Bäckerei, Inselkirche, Rathaus …",
+  `Inselzeit ist deutsche Zeit: Nach Sonnenuntergang gehen die Lichter an, die erste Fähre legt um ${clockText(FERRY.first)} Uhr an.`,
 ];
 {
   const tip = document.getElementById("load-tip");
@@ -75,7 +79,7 @@ const TIPS = [
   const timer = setInterval(show, 4200);
   document.getElementById("enter").addEventListener("click", () => clearInterval(timer), { once: true });
 }
-progress(0.06, "Getting the resident list…");
+progress(0.06, "Einwohnerliste wird geladen …");
 
 // Sakinler: TikTok takipçileri. Asıl liste sunucudaki veritabanındadır; her aktarımdan sonra Cloudflare'e
 // yollanır, site oradan okur. ?nufus=N örnek sakinlerle N kişilik ada kurar (video ve testler için),
@@ -96,7 +100,7 @@ if (!hasSample) {
   if (a.status === "fulfilled") { setVotes(a.value); Object.assign(oylarim, a.value); }
 }
 setPrefs(prefsData, residents);
-progress(0.16, "Building the island…");
+progress(0.16, "Die Insel entsteht …");
 await paint();
 // Ada, en büyük sıra numarasına kadar kurulur: ayrılanların boş kalan evleri de durur (yeni gelen yerleşir).
 const population = residents.reduce((m, r) => Math.max(m, r.slot + 1), 0);
@@ -150,7 +154,7 @@ let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
 } catch (e) {
-  document.getElementById("loading").textContent = "Your browser does not support 3D graphics (WebGL).";
+  document.getElementById("loading").textContent = "Dein Browser kann keine 3D-Grafik darstellen (WebGL).";
   throw e;
 }
 renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 2 : 1.75));
@@ -185,11 +189,11 @@ const world = new World(population);
   world.month = tp && (params.has("test") || params.has("gelistir")) ? Number(tp[1]) - 1 : sim.civilFromDays(sim.dayOf(Date.now() / 1000))[1] - 1;
 }
 const T1 = performance.now();
-progress(0.3, "Laying the roads…");
+progress(0.3, "Straßen werden angelegt …");
 await paint();
 const roads = buildRoads(world);
 const T2 = performance.now();
-progress(0.42, "Shaping the shore and hills…");
+progress(0.42, "Strand und Dünen werden geformt …");
 await paint();
 const terrain = buildTerrain(world);
 const T3 = performance.now();
@@ -200,18 +204,18 @@ const beach = buildBeach(world);
 const fields = buildFields(world);
 scene.add(water, terrain, roads, grounds, harbor, beach, fields);
 const T6 = performance.now();
-progress(0.54, "Putting up traffic lights…");
+progress(0.54, "Ampeln werden aufgestellt …");
 await paint();
 const traffic = new Traffic(world);
 const T7 = performance.now();
 scene.add(buildStops(traffic, world));
 const signals = buildSignals(traffic, world);
 scene.add(signals);
-progress(0.62, "Building homes and shops…");
+progress(0.62, "Häuser und Läden werden gebaut …");
 await paint();
 const city = buildCity(world);
 const T4 = performance.now();
-progress(0.76, "Planting trees…");
+progress(0.76, "Bäume werden gepflanzt …");
 await paint();
 const trees = buildTrees(world);
 const T5 = performance.now();
@@ -242,7 +246,7 @@ const labels = buildLabels(world);
 scene.add(clouds, labels);
 const vehicles = new Vehicles(Math.ceil(population * 0.4) + 80);
 scene.add(vehicles.group);
-progress(0.86, residents.length ? "Residents are settling in…" : "The island is waiting for its first resident…");
+progress(0.86, residents.length ? "Die Einwohner richten sich ein …" : "Die Insel wartet auf ihre ersten Einwohner …");
 await paint();
 const people = new People(world, residents, traffic);
 people.waiting = waiting;
@@ -507,27 +511,27 @@ const flyToTheme = () => {
 const seen = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 const todayKey = () => dateKey(sim.dayOf(simNow()));
 const anketAcik = () => {
-  const t = sim.dayOf(simNow()), wd = sim.weekday(t + 1);
-  const temaAcik = !(wd === 5 || wd === 6 || (wd === 4 && world.workplaces.cami?.some(Boolean)));
+  const t = sim.dayOf(simNow());
+  const temaAcik = !fixedTheme(t + 1, world); // sabit günlerde (takvim, cuma–pazar) oylama yok: anket.js ile aynı
   return (temaAcik && !oylarim[`tema:${dateKey(t + 1)}`]?.benim) || !oylarim[`film:${weekKey(t)}`]?.benim;
 };
-menu.add({ icon: "kitap", label: "News", badge: () => seen.get("gazete") !== todayKey(), run: () => {
+menu.add({ icon: "kitap", label: "Inselbote", badge: () => seen.get("gazete") !== todayKey(), run: () => {
   seen.set("gazete", todayKey());
-  menu.sayfa.open("The Driftwood Gazette", gazete({
-    residents, people, world, zeplin, today: () => sim.dayOf(simNow()), minute: () => sim.minuteOf(simNow()), at: (r) => (r?.hidden ? "Private neighbor" : "@" + (r?.handle ?? "?")),
+  menu.sayfa.open("Wattenooger Inselbote", gazete({
+    residents, people, world, zeplin, today: () => sim.dayOf(simNow()), minute: () => sim.minuteOf(simNow()), at: (r) => (r?.hidden ? "Name verborgen" : "@" + (r?.handle ?? "?")),
     select: (i) => { menu.sayfa.close(); ui.select(i); }, flyToTheme,
     olay: olay.api, flyToOlay: () => { if (!olay.api.odak) return; menu.sayfa.close(); ui.close(); olay.api.git(); },
     sakli: () => ({ ...hidden.info(), bulundu: hidden.found() }), tur: () => { menu.sayfa.close(); ui.close(); tour.start(); },
   }));
 } });
-menu.add({ icon: "ev", label: "My home", badge: () => !seen.get("evim"), hidden: () => !api.available, run: () => { seen.set("evim", "1"); ben.open(); } });
-menu.add({ icon: "sepet", label: "Poll", badge: anketAcik, hidden: () => !api.available, run: () => anket.open() });
-menu.add({ icon: "kamera", label: "Photo", badge: () => !seen.get("foto"), run: () => { seen.set("foto", "1"); ui.close(); menu.enterPhoto(); } });
-menu.add({ icon: "goz", label: "Hidden", badge: () => !hidden.found(), run: () => {
+menu.add({ icon: "ev", label: "Mein Zuhause", badge: () => !seen.get("evim"), hidden: () => !api.available, run: () => { seen.set("evim", "1"); ben.open(); } });
+menu.add({ icon: "sepet", label: "Umfrage", badge: anketAcik, hidden: () => !api.available, run: () => anket.open() });
+menu.add({ icon: "kamera", label: "Foto", badge: () => !seen.get("foto"), run: () => { seen.set("foto", "1"); ui.close(); menu.enterPhoto(); } });
+menu.add({ icon: "goz", label: "Versteckt", badge: () => !hidden.found(), run: () => {
   const h = hidden.info();
   if (!h) return;
-  if (hidden.found()) return ui.toast(`You already found today's hidden object (${h.ad}). A new one is hidden tomorrow.`);
-  ui.toast(`Hint: today there's ${h.ad} ${h.area}. Zoom in and tap it.`, 5000);
+  if (hidden.found()) return ui.toast(`Das versteckte Ding von heute hast du schon gefunden (${h.ad}). Morgen wird ein neues versteckt.`);
+  ui.toast(`Tipp: Heute versteckt sich ${h.ad} ${h.area}. Reinzoomen und antippen.`, 5000);
 } });
 ben.peek();
 if (api.available) Object.assign(claim, { open: (h) => { seen.set("evim", "1"); ui.close(); ben.open(h); menu.refresh(); }, me: () => ben.handle });
@@ -548,10 +552,10 @@ canvas.addEventListener("pointerup", (e) => {
   // Günün saklı nesnesi: bulana seri ve bugün kaç kişinin bulduğu.
   if (hidden.pick(raycaster)) {
     const h = hidden.info(), res = hidden.markFound();
-    const seri = res.seri > 1 ? ` That's ${res.seri} days in a row.` : "";
+    const seri = res.seri > 1 ? ` Schon ${res.seri} Tage in Folge.` : "";
     menu.refresh();
-    if (api.available) api.bulundu(dateKey(h.day), true).then((r) => ui.toast(`You found it: ${h.ad}.${seri} ${plural(r.n, "person", "people")} found it today.`, 5000)).catch(() => ui.toast(`You found it: ${h.ad}.${seri}`, 5000));
-    else ui.toast(`You found it: ${h.ad}.${seri}`, 5000);
+    if (api.available) api.bulundu(dateKey(h.day), true).then((r) => ui.toast(`Gefunden: ${h.ad}.${seri} Heute schon ${plural(r.n, "Person", "Personen")} fündig.`, 5000)).catch(() => ui.toast(`Gefunden: ${h.ad}.${seri}`, 5000));
+    else ui.toast(`Gefunden: ${h.ad}.${seri}`, 5000);
     return;
   }
   const index = people.pick(raycaster);
@@ -709,7 +713,7 @@ const intro = !["bul", "bak", "takip", "denetle"].some((k) => params.has(k));
 const homeView = { target: controls.target.clone(), pos: camera.position.clone() };
 if (intro) camera.position.copy(homeView.target).add(new THREE.Vector3(-120, 900, 1100));
 function ready() {
-  progress(1, "The island is ready");
+  progress(1, "Die Insel ist bereit");
   if (params.has("denetle")) return enter();
   const btn = document.getElementById("enter");
   btn.hidden = false;
@@ -842,6 +846,10 @@ function tick() {
   if (frame % 15 === 0) ui.tick(unix, minute, day, skyState.times);
   if (frame % 8 === 0 && ambience.enabled) ambience.update({ ...soundEnv(dist, light, minute), olay: olay.ses() });
   driftClouds(clouds, dt);
+  // Gelgit: su seviyesi zamandan (gelgit.js); su yüzeyi, tekneler ve şamandıralar onu izler.
+  const tideNow = tideLevel(unix);
+  setTide(tideNow);
+  water.userData.setTide(tideNow);
   water.userData.tick(real);
   city.tick(real);
   harbor.userData.tick(real);
@@ -897,7 +905,7 @@ function tick() {
   mapUI.update(real);
   renderer.render(scene, camera);
   if (frame === 1) {
-    console.info(`Driftwood ready: ${Math.round(performance.now())} ms`);
+    console.info(`Wattenoog bereit: ${Math.round(performance.now())} ms`);
     ready();
   }
   adaptQuality(real);

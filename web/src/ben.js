@@ -21,8 +21,8 @@ export function createBen({ sayfa, residents, people, ui, today, onPrefs, secim,
   function render() {
     if (!sayfa.isOpen) return;
     clearInterval(poll); poll = null;
-    if (!state) return sayfa.set(el("p", "Loading…", "muted"));
-    if (state.hata) return sayfa.set([el("p", `Couldn't connect right now (${state.hata}). Please try again in a bit.`, "muted"), button("Try again", "ana", refresh)]);
+    if (!state) return sayfa.set(el("p", "Lädt …", "muted"));
+    if (state.hata) return sayfa.set([el("p", `Gerade keine Verbindung (${state.hata}). Versuch es gleich noch einmal.`, "muted"), button("Nochmal versuchen", "ana", refresh)]);
     if (state.handle) return sayfa.set(verified());
     if (state.bekleyen && !degistir) {
       poll = setInterval(refresh, 60000); // yorumlar saatte bir okunur; açık kaldıkça dakikada bir bakılır
@@ -36,42 +36,42 @@ export function createBen({ sayfa, residents, people, ui, today, onPrefs, secim,
     // Süresi dolan kod (7 gün içinde yorumu göremedik): kişi neden başa döndüğünü bilsin, aynı adla tek dokunuşla yeniden alsın.
     const eski = state?.suresi_doldu;
     if (eski && !degistir) {
-      out.push(el("p", `The code you got for @${eski} expired; we never saw your comment. Just get a new code with the same name and post it again.`));
+      out.push(el("p", `Dein Code für @${eski} ist abgelaufen; deinen Kommentar haben wir nicht gesehen. Hol dir einfach mit demselben Namen einen neuen Code und poste ihn noch einmal.`));
       if (!prefill) prefill = eski;
     }
-    out.push(el("p", "Is that home on the island yours? Verify it's you, then pick your wall and couch colors, your window flowers and your pet's name, and decide what you do today and who you meet."));
-    out.push(el("p", `How it works: type your username and we'll give you a 4-digit code. Post the code as a comment on any recent @${TIKTOK} video. No password, no login.`, "muted"));
+    out.push(el("p", "Ist das dein Zuhause auf der Insel? Bestätige, dass du es bist. Dann wählst du Wandfarbe, Sofa, Blumen am Fenster und den Namen deines Haustiers und entscheidest, was du heute machst und wen du triffst."));
+    out.push(el("p", `So geht's: Gib deinen Benutzernamen ein, dann bekommst du einen 4-stelligen Code. Den schreibst du als Kommentar unter ein aktuelles Video von @${TIKTOK}. Kein Passwort, kein Login.`, "muted"));
     const input = el("input");
-    Object.assign(input, { type: "text", placeholder: "@username", autocomplete: "off", spellcheck: false, inputMode: "text", value: prefill ? "@" + prefill : "" });
+    Object.assign(input, { type: "text", placeholder: "@benutzername", autocomplete: "off", spellcheck: false, inputMode: "text", value: prefill ? "@" + prefill : "" });
     input.className = "ben-input";
     input.style.cssText = "width:100%;box-sizing:border-box;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--glass-2);color:var(--ink);font:800 15px Nunito,system-ui,sans-serif;margin:8px 0";
     const msg = el("p", "", "muted");
-    const go = button("Get my code", "ana", async () => {
+    const go = button("Code holen", "ana", async () => {
       const h = input.value.trim().replace(/^@/, "").toLowerCase();
-      if (!/^[a-z0-9._]{2,24}$/.test(h)) { msg.textContent = "Type your username exactly as on TikTok (letters, numbers, periods, underscores)."; return; }
+      if (!/^[a-z0-9._]{2,24}$/.test(h)) { msg.textContent = "Gib deinen Benutzernamen genau wie auf TikTok ein (Buchstaben, Ziffern, Punkte, Unterstriche)."; return; }
       if (busy) return;
       busy = true;
       try { await api.baslat(h); degistir = false; prefill = ""; await refresh(); } catch (e) { msg.textContent = e.message; } finally { busy = false; }
     });
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
     out.push(input, go, msg);
-    if (degistir && state?.bekleyen) out.push(button("Back to my code", "secim", () => { degistir = false; render(); }));
+    if (degistir && state?.bekleyen) out.push(button("Zurück zu meinem Code", "secim", () => { degistir = false; render(); }));
     return out;
   }
 
   function pending() {
     const { kod, handle, gorulen, kalan_gun } = state.bekleyen;
     const out = [];
-    out.push(el("p", `Your code for @${handle}:`));
+    out.push(el("p", `Dein Code für @${handle}:`));
     out.push(el("p", kod, "kod"));
-    out.push(el("p", `Comment it from @${handle} on any @${TIKTOK} video. The code just has to be in your comment: "code ${kod}" or only "${kod}".`));
+    out.push(el("p", `Schreib ihn als @${handle} unter irgendein Video von @${TIKTOK}. Der Code muss nur im Kommentar stehen: „Code ${kod}“ oder einfach „${kod}“.`));
     // Kod başka bir hesaptan yazılmış görüldüyse kişi neden eşleşmediğini bilsin.
-    if (gorulen) out.push(el("p", `We saw your code posted from @${gorulen}, but it was made for @${handle}. Post it from @${handle}, or fix the username.`));
+    if (gorulen) out.push(el("p", `Wir haben deinen Code bei @${gorulen} gesehen, er gehört aber zu @${handle}. Poste ihn als @${handle} oder korrigiere den Benutzernamen.`));
     const gun = kalan_gun ?? 7;
-    out.push(el("p", `We read comments every hour, but TikTok can be slow to show them to us: it usually matches within a few hours. When it does, this page opens by itself (this device remembers, even if you close the page). The code is good for ${gun} more ${gun === 1 ? "day" : "days"}; no need to get a new one.`, "muted"));
-    out.push(el("p", "Post it as a new comment on the video, not as a reply to another comment; we see those faster.", "muted"));
-    if (idxOf(handle) < 0) out.push(el("p", "This name isn't on the island right now. Follow on TikTok first; your home is ready at the next move-in.", "muted"));
-    out.push(button("Check now", "secim", refresh), button("Change username", "secim", () => { degistir = true; prefill = handle; render(); }));
+    out.push(el("p", `Wir lesen die Kommentare jede Stunde, aber TikTok zeigt sie uns manchmal mit Verspätung: Meist klappt es innerhalb weniger Stunden. Dann öffnet sich diese Seite von selbst (dieses Gerät merkt es sich, auch wenn du die Seite schließt). Der Code gilt noch ${gun === 1 ? "1 Tag" : `${gun} Tage`}; du brauchst keinen neuen.`, "muted"));
+    out.push(el("p", "Schreib ihn als neuen Kommentar unter das Video, nicht als Antwort auf einen anderen Kommentar; die sehen wir schneller.", "muted"));
+    if (idxOf(handle) < 0) out.push(el("p", "Dieser Name wohnt gerade nicht auf der Insel. Folg uns zuerst auf TikTok (du folgst schon länger? Dann schreib „einziehen“ unter ein Video); beim nächsten Einzug ist dein Zuhause fertig.", "muted"));
+    out.push(button("Jetzt prüfen", "secim", refresh), button("Benutzernamen ändern", "secim", () => { degistir = true; prefill = handle; render(); }));
     return out;
   }
 
@@ -94,7 +94,7 @@ export function createBen({ sayfa, residents, people, ui, today, onPrefs, secim,
       const b = el("button", null, "renk" + (state.tercih[key] === c ? " on" : ""));
       b.style.background = c;
       b.setAttribute("aria-label", `${title} ${c}`);
-      b.addEventListener("click", () => save({ [key]: state.tercih[key] === c ? null : c }, "Saved"));
+      b.addEventListener("click", () => save({ [key]: state.tercih[key] === c ? null : c }, "Gespeichert"));
       box.append(b);
     }
     return [el("h3", title), box];
@@ -109,58 +109,58 @@ export function createBen({ sayfa, residents, people, ui, today, onPrefs, secim,
   function verified() {
     const h = state.handle, i = idxOf(h), t = state.tercih ?? {};
     const out = [];
-    out.push(el("p", `You're verified as @${h}.`));
-    if (i < 0) { out.push(el("p", "You don't have a home on the island yet. Follow on TikTok; once you move in at the next move-in, your choices show up in your home.", "muted")); }
+    out.push(el("p", `Bestätigt: Du bist @${h}.`));
+    if (i < 0) { out.push(el("p", "Du hast noch kein Zuhause auf der Insel. Folg uns auf TikTok (oder schreib „einziehen“ unter ein Video, wenn du schon länger folgst); nach dem nächsten Einzug siehst du deine Auswahl in deinem Zuhause.", "muted")); }
     else {
-      const go = button("Go to my home", "ana", () => { sayfa.close(); ui.select(i); });
-      const share = button("Share my card", "secim", () => { sayfa.close(); ui.select(i); setTimeout(() => document.querySelector("#card-actions button:last-child")?.click(), 1200); });
+      const go = button("Zu meinem Zuhause", "ana", () => { sayfa.close(); ui.select(i); });
+      const share = button("Meine Karte teilen", "secim", () => { sayfa.close(); ui.select(i); setTimeout(() => document.querySelector("#card-actions button:last-child")?.click(), 1200); });
       out.push(go, share);
     }
-    out.push(...swatches("duvar", "Wall color"), ...swatches("koltuk", "Couch"), ...swatches("perde", "Curtains"));
-    out.push(el("h3", "Window flowers"), chips(SECENEK.cicek.filter((c) => c !== "yok"), t.cicek, (c) => CICEK_AD[c], (c) => save({ cicek: c }, c ? "Flowers are in your window" : "Flowers removed")));
+    out.push(...swatches("duvar", "Wandfarbe"), ...swatches("koltuk", "Sofa"), ...swatches("perde", "Gardinen"));
+    out.push(el("h3", "Blumen am Fenster"), chips(SECENEK.cicek.filter((c) => c !== "yok"), t.cicek, (c) => CICEK_AD[c], (c) => save({ cicek: c }, c ? "Die Blumen stehen am Fenster" : "Blumen entfernt")));
     const pet = i >= 0 ? sim.pet(residents[i], today()) : null;
     if (pet) {
-      out.push(el("h3", `${pet}'s name`));
-      out.push(chips(SECENEK.evcil_ad, t.evcil_ad, (n) => n, (n) => save({ evcil_ad: n }, n ? `Your ${pet.toLowerCase()} is now ${n}` : null)));
-    } else out.push(el("p", "You don't have a pet. Comment “pet: cat” on one of our videos and it arrives at the next move-in; then you can pick its name here.", "muted"));
+      out.push(el("h3", `Name für dein Haustier (${pet})`));
+      out.push(chips(SECENEK.evcil_ad, t.evcil_ad, (n) => n, (n) => save({ evcil_ad: n }, n ? `Dein Haustier heißt jetzt ${n}` : null)));
+    } else out.push(el("p", "Du hast kein Haustier. Schreib „Haustier: Katze“ unter eines unserer Videos, dann kommt es beim nächsten Einzug; danach suchst du hier den Namen aus.", "muted"));
 
     // Bugün: etkinlik ve buluşma (yalnız bugüne geçerli).
     const g = t.gun?.tarih === dateKey(today()) ? t.gun : {};
-    out.push(el("h3", "What should I do today?"));
-    out.push(el("p", "Your character does it if it fits the hours you're out (stargazing, for example, happens at night).", "muted"));
-    const setGun = (patch) => save({ gun: { tarih: dateKey(today()), etkinlik: g.etkinlik ?? null, bulusma: g.bulusma ?? null, ...patch } }, "Today's plan saved");
+    out.push(el("h3", "Was mache ich heute?"));
+    out.push(el("p", "Deine Figur macht das, wenn es in die Zeit passt, in der sie draußen ist (Sternegucken zum Beispiel nur nachts).", "muted"));
+    const setGun = (patch) => save({ gun: { tarih: dateKey(today()), etkinlik: g.etkinlik ?? null, bulusma: g.bulusma ?? null, ...patch } }, "Plan für heute gespeichert");
     out.push(chips(SECENEK.etkinlik, g.etkinlik, (id) => ETKINLIK[id]?.ad.replace(/,.*$/, "") ?? id, (id) => setGun({ etkinlik: id })));
-    out.push(el("h3", "Who should I meet?"));
-    out.push(el("p", "If you both pick each other, you'll be out at the same place at the same time.", "muted"));
+    out.push(el("h3", "Wen treffe ich?"));
+    out.push(el("p", "Wenn ihr euch gegenseitig auswählt, seid ihr zur selben Zeit am selben Ort.", "muted"));
     const friends = residents.filter((r) => r.handle && r.handle !== h).map((r) => r.handle).sort();
     const sel = el("select");
     sel.style.cssText = "width:100%;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--glass-2);color:var(--ink);font:800 14px Nunito,system-ui,sans-serif";
-    sel.append(new Option("Nobody", ""), ...friends.map((f) => new Option("@" + f, f, false, g.bulusma === f)));
+    sel.append(new Option("Niemanden", ""), ...friends.map((f) => new Option("@" + f, f, false, g.bulusma === f)));
     sel.addEventListener("change", () => setGun({ bulusma: sel.value || null }));
     out.push(sel);
     if (g.bulusma) {
       const other = people.residents.findIndex((r) => r.handle === g.bulusma);
       const mutual = other >= 0 && people.meet?.[i] === other;
-      out.push(el("p", mutual ? `@${g.bulusma} picked you too: you're meeting up today.` : `You'll meet if @${g.bulusma} picks you too. Let them know.`, "muted"));
+      out.push(el("p", mutual ? `@${g.bulusma} hat dich auch gewählt: Ihr trefft euch heute.` : `Ihr trefft euch, wenn @${g.bulusma} dich auch wählt. Sag Bescheid.`, "muted"));
     }
 
     // Seçim (açıksa): adaylık ve oy siteden de verilir; sunucu yorumdakiyle aynı kuralı uygular.
     const s = secim?.();
     if (s?.durum === "acik") {
-      out.push(el("h3", "Mayoral election"));
-      out.push(button("I'm running", "secim", async () => { try { await api.secim({ aday: true }); ui.toast("You're signed up as a candidate; you'll be on the list after the next count"); } catch (e) { ui.toast(e.message); } }));
-      for (const [ad] of (s.adaylar ?? []).filter(([a]) => a)) out.push(button(`Vote: @${ad}`, "secim", async () => { try { await api.secim({ oy: ad }); ui.toast("Vote saved; it's counted at the next count"); } catch (e) { ui.toast(e.message); } }));
+      out.push(el("h3", "Bürgermeisterwahl"));
+      out.push(button("Ich kandidiere", "secim", async () => { try { await api.secim({ aday: true }); ui.toast("Kandidatur eingetragen; nach der nächsten Auszählung stehst du auf der Liste"); } catch (e) { ui.toast(e.message); } }));
+      for (const [ad] of (s.adaylar ?? []).filter(([a]) => a)) out.push(button(`Stimme für @${ad}`, "secim", async () => { try { await api.secim({ oy: ad }); ui.toast("Stimme gespeichert; sie zählt bei der nächsten Auszählung"); } catch (e) { ui.toast(e.message); } }));
     }
     out.push(el("p", " "));
-    out.push(button("Sign out on this device", "secim", async () => { await api.cikis(); state = null; refresh(); }));
+    out.push(button("Auf diesem Gerät abmelden", "secim", async () => { await api.cikis(); state = null; refresh(); }));
     return out;
   }
 
   return {
-    /** handle: karttaki "This is me" ile gelindiyse ad kutusu dolu gelir. */
+    /** handle: karttaki "Das bin ich" ile gelindiyse ad kutusu dolu gelir. */
     open(handle = "") {
       prefill = handle;
-      sayfa.open("My home", el("p", "Loading…", "muted"));
+      sayfa.open("Mein Zuhause", el("p", "Lädt …", "muted"));
       refresh();
     },
     /** Sayfa yüklenince: doğrulanmışsa sessizce durumu al (kart ve menü için). */

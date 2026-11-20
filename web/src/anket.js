@@ -1,21 +1,19 @@
-// Anketler: yarının günün olayı (sabit günler hariç: cami açıksa cuma namazı, cumartesi sinema, pazar keyfi) ve
-// cumartesi sinemasının film türü (haftalık). Cihaz başına bir oy (değiştirilebilir); sonuçlar herkese açık.
-// Kazanan olay ertesi gün adada gerçekten olur (etkinlik.js dayTheme), film türü perdede oynar.
+// Anketler: yarının günün olayı (sabit günler hariç: takvim günleri, cuma Shanty-Chor, cumartesi pazar ve plaj sineması,
+// pazar kilisesi/yürüyüşü) ve cumartesi sinemasının film türü (haftalık). Cihaz başına bir oy (değiştirilebilir); sonuçlar
+// herkese açık. Kazanan olay ertesi gün adada gerçekten olur (etkinlik.js dayTheme), film türü perdede oynar.
 import { api } from "./api.js";
 import { FILM_AD, FILM_SECENEK, TEMA_AD, TEMA_SECENEK, dateKey, setVotes, weekKey } from "./tercih.js";
 import * as sim from "./sim.js";
 import { DAYS, num, plural } from "./fmt.js";
+import { fixedTheme, themeOptions } from "./world/etkinlik.js";
 
 export function createAnket({ sayfa, today, world, toast, onVote }) {
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
 
-  /** Yarın sabit bir gün mü (oylama yok)? etkinlik.js dayTheme ile aynı kural. */
+  /** Yarın sabit bir gün mü (oylama yok)? etkinlik.js dayTheme ile aynı kural (fixedTheme). */
   function fixedTomorrow() {
-    const wd = sim.weekday(today() + 1);
-    if (wd === 4 && world.workplaces.cami?.some(Boolean)) return "Tomorrow is Friday: community lunch at the church hall";
-    if (wd === 5) return "Tomorrow is Saturday: beach movie night";
-    if (wd === 6) return "Tomorrow is Sunday: picnics and walks";
-    return null;
+    const th = fixedTheme(today() + 1, world);
+    return th ? th.ad : null;
   }
 
   function poll(id, title, note, options, labels, data) {
@@ -27,25 +25,29 @@ export function createAnket({ sayfa, today, world, toast, onVote }) {
       const n = counts[o] ?? 0;
       const b = el("button", `${labels[o]}${n ? ` · ${num(n)}` : ""}`, "secim" + (mine === o ? " on" : ""));
       b.addEventListener("click", async () => {
-        try { await api.oy(id, o); onVote?.(id, o); toast("Vote saved"); await open(true); } catch (e) { toast(e.message); }
+        try { await api.oy(id, o); onVote?.(id, o); toast("Stimme gespeichert"); await open(true); } catch (e) { toast(e.message); }
       });
       out.push(b);
       if (total) { const bar = el("div", null, "cubuk"); const fill = el("i"); fill.style.width = `${Math.round((n / total) * 100)}%`; bar.append(fill); out.push(bar); }
     }
-    out.push(el("p", total ? `${plural(total, "vote")} so far.` : "No votes yet. Be the first.", "muted"));
+    out.push(el("p", total ? `Bisher ${plural(total, "Stimme", "Stimmen")}.` : "Noch keine Stimmen. Fang du an.", "muted"));
     return out;
   }
 
   async function open(keep = false) {
-    if (!keep) sayfa.open("Poll", el("p", "Loading…", "muted"));
+    if (!keep) sayfa.open("Umfrage", el("p", "Lädt …", "muted"));
     const t = today(), tema = `tema:${dateKey(t + 1)}`, film = `film:${weekKey(t)}`;
     let res = {};
-    try { res = await api.anket([tema, film, `tema:${dateKey(t)}`]); setVotes(res); } catch (e) { return sayfa.set([el("p", `Couldn't connect right now (${e.message}).`, "muted")]); }
+    try { res = await api.anket([tema, film, `tema:${dateKey(t)}`]); setVotes(res); } catch (e) { return sayfa.set([el("p", `Gerade keine Verbindung (${e.message}).`, "muted")]); }
     const out = [];
     const fixed = fixedTomorrow();
-    if (fixed) out.push(el("h3", "Tomorrow"), el("p", `${fixed}. Voting on the day's event opens for Mondays through Thursdays.`, "muted"));
-    else out.push(...poll(tema, `What should happen on the island tomorrow (${DAYS[sim.weekday(t + 1)]})?`, "Vote until midnight; the winner happens on the island tomorrow.", TEMA_SECENEK, TEMA_AD, res[tema]));
-    out.push(...poll(film, "What should play at Saturday movie night?", "This week's vote; it plays on the screen at the beach Saturday evening.", FILM_SECENEK, FILM_AD, res[film]));
+    if (fixed) out.push(el("h3", `Morgen (${DAYS[sim.weekday(t + 1)]})`), el("p", `${fixed}. Abgestimmt wird über die Tage von Montag bis Donnerstag.`, "muted"));
+    else {
+      // Yalnız yarın adada gerçekten olabilecekler (yeri açılmamış ya da mevsimi olmayan seçenek gösterilmez).
+      const olur = new Set(themeOptions(t + 1, world).map((x) => x.id));
+      out.push(...poll(tema, `Was soll morgen (${DAYS[sim.weekday(t + 1)]}) auf der Insel passieren?`, "Abstimmen bis Mitternacht; was gewinnt, passiert morgen auf der Insel.", TEMA_SECENEK.filter((id) => olur.has(id)), TEMA_AD, res[tema]));
+    }
+    out.push(...poll(film, "Was läuft am Samstag im Strandkino?", "Abstimmung dieser Woche; der Film läuft Samstagabend auf der Leinwand am Strand.", FILM_SECENEK, FILM_AD, res[film]));
     sayfa.set(out);
   }
 

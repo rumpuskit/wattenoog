@@ -32,7 +32,9 @@ def python_vectors(day: int, handles: list[str]) -> list[dict]:
     for i, handle in enumerate(handles, start=1):
         r = {"handle": handle, "seed": sim.seed_of(handle), "slot": i * 977, "arrived_day": day - i % 60}
         if i % 7 == 3:
-            r["overrides"] = {"meslek": "polis" if i % 2 else "muhtar"}
+            r["overrides"] = {"meslek": "polis" if i % 2 else "muhtar", **({"form": "w"} if i % 3 == 0 else {})}
+        elif i % 13 == 4:
+            r["overrides"] = {"form": "m" if i % 2 else "w"}
         elif i % 11 == 5:
             r["overrides"] = {"meslek": "okul_muduru" if i % 2 else "hakim"}
         out.append({

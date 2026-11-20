@@ -71,15 +71,15 @@ export function createMenu({ capture, minute, today, shiftView, toast }) {
     const h = Math.round(w * (innerHeight / innerWidth));
     const shot = capture(null, w, h);
     const day = today();
-    lastShot = photoFrame(shot, `${DAYS[sim.weekday(day)]} ${clockText(minute())}`);
+    lastShot = photoFrame(shot, `${DAYS[sim.weekday(day)]}, ${clockText(minute())} Uhr`);
     $("foto-img").src = lastShot.toDataURL("image/jpeg", 0.9);
     $("foto-onizleme").hidden = false;
   });
   $("foto-yeniden").addEventListener("click", () => { $("foto-onizleme").hidden = true; });
   $("foto-paylas").addEventListener("click", async () => {
     if (!lastShot) return;
-    const res = await shareCanvas(lastShot, { name: `driftwood-foto-${Date.now()}`, text: "A moment on Driftwood Island", url: "https://wattenoog.rumpuskit.com" });
-    if (res.startsWith("indirildi")) toast("Photo downloaded");
+    const res = await shareCanvas(lastShot, { name: `wattenoog-foto-${Date.now()}`, text: "Ein Moment auf Wattenoog", url: "https://wattenoog.rumpuskit.com" });
+    if (res.startsWith("indirildi")) toast("Foto heruntergeladen");
   });
   $("foto-kapat").addEventListener("click", exitPhoto);
 

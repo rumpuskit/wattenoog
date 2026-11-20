@@ -1,6 +1,7 @@
 """Sunucu betiklerinin ortak parçaları: yollar, psql çağrısı, sakin listesinin yayını."""
 
 import hashlib
+import hmac
 import json
 import os
 import subprocess
@@ -40,6 +41,44 @@ def opt_out_hash(platform: str, handle: str) -> str:
     return hashlib.sha256(key_of(platform, handle).encode()).hexdigest()
 
 
+# --- Taban (DEVIR §4.7): hesabın eski takipçileri yalnız yorumda isterse taşınır ---
+# İlk canlı taramadaki takipçilerin kullanıcı adı saklanmaz; yalnız tuzlu SHA-256 özeti (HMAC-SHA256, anahtar = tuz)
+# `taban` tablosunda durur. Tuz secrets/taban.json'da ({"tuz": "..."}); testler WATTENOOG_TABAN_TUZ verir.
+# Tuz kaybolursa özetler eşleşmez ve bütün eski takipçiler taşınır: tuz yedeklenmeli (secret gibi).
+TABAN_TUZ_DOSYA = SECRETS / "taban.json"
+
+
+def taban_tuz(olustur: bool = False) -> str:
+    """Taban tuzu. olustur=True yalnız taban ilk kez alınırken: dosya yoksa rastgele tuz yazılır (600)."""
+    if t := os.environ.get("WATTENOOG_TABAN_TUZ"):
+        return t
+    try:
+        tuz = json.loads(TABAN_TUZ_DOSYA.read_text())["tuz"]
+    except FileNotFoundError:
+        if not olustur:
+            sys.exit(f"HATA: {TABAN_TUZ_DOSYA} yok; taban özetleri hesaplanamaz (eski takipçiler taşınmasın diye durdu)")
+        import secrets
+        tuz = secrets.token_hex(32)
+        TABAN_TUZ_DOSYA.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(TABAN_TUZ_DOSYA, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump({"tuz": tuz}, f)
+    except (KeyError, ValueError):
+        sys.exit(f'HATA: {TABAN_TUZ_DOSYA} bozuk ({{"tuz": "..."}} bekleniyor)')
+    if not isinstance(tuz, str) or len(tuz) < 16:
+        sys.exit(f"HATA: {TABAN_TUZ_DOSYA} içindeki tuz çok kısa (en az 16 karakter)")
+    return tuz
+
+
+def taban_ozet(handle: str, tuz: str | None = None, platform: str = "tt") -> str:
+    return hmac.new((tuz or taban_tuz()).encode(), key_of(platform, handle).encode(), hashlib.sha256).hexdigest()
+
+
+def taban_ozetleri(db: str = DB) -> set[str]:
+    """Kayıtlı taban özetleri (boşsa taban alınmamış: herkes eskisi gibi taşınır)."""
+    return set(psql("SELECT ozet FROM taban", db).split())
+
+
 def publish(db: str = DB) -> dict:
     """Aktif sakinleri ve iskelede bekleyen sayısını public/sakinler.json'a yazar (atomik) ve
     Cloudflare Worker'ına yollar; site listeyi oradan okur (sunucuya ziyaretçi trafiği gelmez)."""
@@ -56,6 +95,14 @@ def publish(db: str = DB) -> dict:
     # taşınmada profil sayısı ile nüfus farkı. Bunlar iskelede "bekleyen" sayılmaz.
     disarida = psql("SELECT deger FROM durum WHERE anahtar = 'disarida'", db)
     disarida = json.loads(disarida)["sayi"] if disarida else 0
+    # Taban: katılmamış eski takipçiler listede olup taşınmadıkları için disarida'nın içindedir (disarida = son
+    # taşınmada profil sayısı − nüfus; taban alınırken de yazılır), iskelede bekleyen görünmezler. Ayrı sayı tutulmaz.
+    # Son taşınmadan sonra katılım yazan eski takipçi ise sonraki taşınmada gelir: iskelede bekler. Taşınmada adaya
+    # gelmemiş katılımların sayısı 'katilim_disarida'ya yazılır (listede değiller); bekleyen, bu sayının üstündeki artıştır.
+    katilim = int(psql("""SELECT count(*) FROM katilim k WHERE NOT EXISTS
+                          (SELECT 1 FROM sakinler s WHERE s.platform = 'tt' AND s.handle = k.handle)""", db) or 0)
+    katilim_disarida = psql("SELECT deger FROM durum WHERE anahtar = 'katilim_disarida'", db)
+    katilim_bekleyen = max(0, katilim - (json.loads(katilim_disarida)["sayi"] if katilim_disarida else 0))
     son = psql("SELECT coalesce(max(extract(epoch FROM imported_at))::bigint, 0) FROM aktarimlar", db)
     # Gelişim düzeyi: adanın ulaştığı en yüksek nüfus (en büyük sıra + 1). Ayrılanlar yüzünden düşmez;
     # site neyin açık olduğunu (iş yerleri, yollar, parklar) buna göre kurar.
@@ -71,7 +118,7 @@ def publish(db: str = DB) -> dict:
         "son_aktarim": int(son or 0),
         "takipci": takipci,
         # Takip etmiş ama henüz aktarımla taşınmamış olanlar: iskelede valizleriyle bekler.
-        "bekleyen": max(0, takipci - disarida - len(sakinler)) if takipci is not None else 0,
+        "bekleyen": (max(0, takipci - disarida - len(sakinler)) if takipci is not None else 0) + katilim_bekleyen,
         "zirve": zirve,
         # [handle | null (adı gizli), seed, slot, arrived_day, overrides | null]
         "sakinler": sakinler,

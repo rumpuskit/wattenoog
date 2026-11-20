@@ -1,7 +1,7 @@
 // Harita ve gezinme: mini harita (dokununca oraya gider), yer paneli, arama (kullanıcı adı ya da yer,
 // yazarken öneri), yakınlaştırma ve pusula.
 import { svg, YER_SIMGE } from "./icons.js";
-import { at } from "./ui.js";
+import { at, PLACE_NAMES } from "./ui.js";
 import * as sim from "./sim.js";
 
 const $ = (id) => document.getElementById(id);
@@ -133,20 +133,22 @@ export function createMapUI({ world, camera, controls, flyTo, ui, residents, zep
   // Mahalle etiketleri: katalogdaki mahalle adlarıyla aynı metin (sim.mahalleName, soneksiz).
   const mahalleler = new Set(sim.cat().mahalleler);
   const places = [
-    ["Town Green", 0, 0, 90],
-    world.ferryPier && ["Ferry Landing", (world.ferryPier.x0 + world.ferryPier.x1) / 2, world.ferryPier.z0 + 20, 110],
-    ["Main Street", -150, world.avenueZ(-150), 120],
-    world.lunapark && [yerAdi("lunapark", "Pier Amusements"), ...world.lunapark.wheel, 120],
-    world.pitch && ["Gulls Field", world.pitch.cx, world.pitch.cz, 110],
-    prom && ["Harbor Walk", ...prom[Math.floor(prom.length / 2)], 90],
-    park && ["Kettle Pond Park", (park.x0 + park.x1) / 2, (park.z0 + park.z1) / 2, 120],
-    [yerAdi("plaj", "Ocean Beach"), ...world.places.plaj.anchors[4], 110],
-    ["Bluff Head", ...world.places.tepe.anchors[0], 120],
-    [yerAdi("fener", "Gull Point Light"), world.fener.x, world.fener.z, 90],
-    tarla && [tarla.name ?? yerAdi("tarla", "Cranberry Bog"), ...tarla.anchor, 160],
+    [PLACE_NAMES.meydan, 0, 0, 90],
+    world.ferryPier && ["Fähranleger", (world.ferryPier.x0 + world.ferryPier.x1) / 2, world.ferryPier.z0 + 20, 110],
+    ["Strandstraße", ...(world.strandAt ?? [0, -220]), 120],
+    world.lunapark && [yerAdi("lunapark", "Kurhaus"), world.lunapark.building.x, world.lunapark.building.z, 120],
+    world.pitch && [yerAdi("saha", PLACE_NAMES.saha), world.pitch.cx, world.pitch.cz, 110],
+    prom && [PLACE_NAMES.sahil_yolu, ...prom[Math.floor(prom.length / 2)], 90],
+    park && [PLACE_NAMES.park, (park.x0 + park.x1) / 2, (park.z0 + park.z1) / 2, 120],
+    [yerAdi("plaj", PLACE_NAMES.plaj), ...world.places.plaj.anchors[4], 110],
+    [PLACE_NAMES.tepe, ...world.places.tepe.anchors[0], 120],
+    [yerAdi("fener", PLACE_NAMES.fener), world.fener.x, world.fener.z, 90],
+    world.places.watt && [PLACE_NAMES.watt, ...world.places.watt.anchors[0], 160],
+    world.places.deich && [PLACE_NAMES.deich, ...world.places.deich.anchors[0], 140],
+    tarla && [tarla.name ?? yerAdi("tarla", "Polder"), ...tarla.anchor, 160],
     ...world.labels.filter((l) => mahalleler.has(l.text)).map((l) => [l.text, l.x, l.z, 220]),
     // Zeplin: yeri sabit değil; dokununca kartı açılır ve uçuştaysa izlenir.
-    zeplin && [yerAdi("zeplin", "Driftwood Blimp"), 0, 0, 0, () => ui.selectVehicle({ kind: "zeplin" })],
+    zeplin && [yerAdi("zeplin", "Wattenoog-Zeppelin"), 0, 0, 0, () => ui.selectVehicle({ kind: "zeplin" })],
   ].filter(Boolean);
   const icon = (name) => svg(YER_SIMGE[name] ?? "mahalle");
   const go = ([, x, z, d, act]) => {
@@ -194,8 +196,8 @@ export function createMapUI({ world, camera, controls, flyTo, ui, residents, zep
       const li = document.createElement("li");
       li.setAttribute("role", "option");
       const ic = document.createElement("span"), name = document.createElement("span"), note = document.createElement("small");
-      if (it.kind === "yer") { ic.innerHTML = icon(it.pl[0]); name.textContent = it.pl[0]; note.textContent = "place"; }
-      else { ic.innerHTML = svg("kisi"); name.textContent = at(residents[it.i]); note.textContent = "resident"; }
+      if (it.kind === "yer") { ic.innerHTML = icon(it.pl[0]); name.textContent = it.pl[0]; note.textContent = "Ort"; }
+      else { ic.innerHTML = svg("kisi"); name.textContent = at(residents[it.i]); note.textContent = "Einwohner"; }
       li.append(ic, name, note);
       li.addEventListener("pointerdown", (e) => { e.preventDefault(); choose(n); });
       return li;

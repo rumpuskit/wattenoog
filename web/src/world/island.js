@@ -54,13 +54,16 @@ export function northShoreZ(x) {
 // Havuz kıyıdan içeri kazılmış; kuzey rıhtımı (Hafenkante) z = 640, batı ve doğu duvarları x = −160 / 320. İki moloz
 // dalgakıran güneye uzanıp ağızda (x 40…150) birbirine döner. Feribot iskelesi havuzun doğu yarısında, Kutterhafen batı
 // yarısında. Ağızdan güneye taranmış kanal (Fahrrinne): feribot gelgitten bağımsız işler.
-export const HAFEN = { x0: -160, x1: 320, z0: 640, mouth: [40, 150], moleZ: 916, kanalX: 95 };
-const MOLES = [
-  [-172, 760, -172, 902], [-172, 902, 30, 916], // batı mendirek
-  [332, 760, 332, 902], [332, 902, 160, 916], // doğu mendirek
+export const HAFEN = { x0: -160, x1: 320, z0: 640, z1: 916, mouth: [30, 150], kutterX: 40 };
+/** Mendirekler (taş dalgakıran): kara değil, üstü yürünebilir yapı (layout.js piers + city.js "mendirek"). Kutular. */
+export const MOLES = [
+  { x0: -170, x1: -160, z0: 690, z1: 916 }, // batı mendirek (havuzun batı duvarının uzantısı)
+  { x0: -170, x1: 30, z0: 906, z1: 916 }, // batı kol
+  { x0: 320, x1: 330, z0: 690, z1: 916 }, // doğu mendirek
+  { x0: 150, x1: 330, z0: 906, z1: 916 }, // doğu kol
 ];
-/** Hafenstraße: havuzun kuzeyinde, rıhtıma paralel (z = 600). */
-export const HAFEN_Z = 600;
+/** Hafenstraße: havuzun kuzeyinde, rıhtıma paralel (z = 560); arada 80 m'lik rıhtım önü (feribot, Versorgungshafen). */
+export const HAFEN_Z = 560;
 
 // --- Strandstraße: Marktplatz'tan kumsala (yaya bölgesi; ilk ~450 m dükkân, sonra Kurviertel villaları) ---
 export const STRAND = [[0, -45], [-6, -330], [-20, -720], [-14, -1110], [0, -1490]];
@@ -104,10 +107,9 @@ export function land(x, z) {
   d = smax(d, -capsuleSd(x, z, 3650, -660, 4600, -780, 95), 80); // Ostplate kum burnu
   d = smax(d, -capsuleSd(x, z, -3550, -480, -3100, -420, 470), 200); // batı başı (Westkopf)
   d += fbm(x / 190, z / 190, 5) * 55 * (1 - quiet(x, z));
-  // Liman havuzu: kıyıdan içeri kazılmış (kuzey rıhtımı z0), dalgakıranlar sonradan eklenir.
-  const basin = boxIn(x, z, { x0: HAFEN.x0, x1: HAFEN.x1, z0: HAFEN.z0, z1: 900 });
+  // Liman havuzu: kıyıdan içeri kazılmış (kuzey rıhtımı z0); mendirekler kara değil (MOLES).
+  const basin = boxIn(x, z, { x0: HAFEN.x0, x1: HAFEN.x1, z0: HAFEN.z0, z1: 1000 });
   d = Math.min(d, -basin);
-  for (const [ax, az, bx, bz] of MOLES) d = Math.max(d, -capsuleSd(x, z, ax, az, bx, bz, 9));
   if (landCache.size > 400000) landCache.clear();
   landCache.set(key, d);
   return d;
@@ -145,10 +147,10 @@ export function inReserve(x, z, pad = 0, late = false) {
 // (doğuya, polderin kuzeyinden), Dünenweg (kuzeybatıya, kumul kuşağı boyunca), Kurstraße (kuzeydoğuya, Kurviertel'in
 // doğusundan kumullara).
 export const TRUNKS = [
-  { id: "west", name: "Westerweg", pts: [[-130, 20], [-520, 60], [-1000, 80], [-1550, 40], [-2150, -80], [-2750, -260]] },
-  { id: "ost", name: "Ostdorfer Straße", pts: [[130, 20], [480, -20], [850, -120], [1250, -260], [1700, -420], [2200, -560], [2700, -640], [3050, -700]] },
-  { id: "duene", name: "Dünenweg", pts: [[-110, -110], [-260, -500], [-560, -880], [-1000, -1020], [-1550, -1080], [-2200, -1060], [-2650, -980]] },
-  { id: "kur", name: "Kurstraße", pts: [[110, -110], [300, -500], [480, -880], [820, -1060], [1350, -1120], [1950, -1020], [2450, -880]] },
+  { id: "west", name: "Westerweg", pts: [[-115, 20], [-520, 60], [-1000, 80], [-1550, 40], [-2150, -80], [-2750, -260]] },
+  { id: "ost", name: "Ostdorfer Straße", pts: [[115, 20], [480, -20], [850, -120], [1250, -260], [1700, -420], [2200, -560], [2700, -640], [3050, -700]] },
+  { id: "duene", name: "Dünenweg", pts: [[-115, -70], [-260, -500], [-560, -880], [-1000, -1020], [-1550, -1080], [-2200, -1060], [-2650, -980]] },
+  { id: "kur", name: "Kurstraße", pts: [[115, -70], [300, -500], [480, -880], [820, -1060], [1350, -1120], [1950, -1020], [2450, -880]] },
 ];
 
 /** Polilin üstünde s uzunluğundaki nokta ve birim teğet. */
@@ -183,7 +185,7 @@ export const ZONE = { pitch: 60, row0: 30, avenue: 7, strip: 27, side: 7, depth:
 export const HOUSE = {
   friesenhaus: { perSide: 20, lot: 14 },
   doppelhaus: { perSide: 10, lot: 16 },
-  reihenhaus: { perSide: 5, lot: 22 },
+  kapitaenshaus: { perSide: 5, lot: 22 },
   mehrfamilienhaus: { perSide: 3, lot: 34 },
 };
 
@@ -395,16 +397,20 @@ export function flatness(x, z) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-/** Liman kıyısı rıhtım mı (0..1)? Havuzun duvarları ve iki yanındaki rıhtımlar (x −760…980): kumsal yerine taş duvar. */
+/** Liman kıyısı rıhtım mı (0..1)? Havuzun duvarları ve iki yanı (x −330…430; ötesi set ve tuzlu bataklık). */
 export function quay(x, z) {
-  return quiet(x, z) * smooth((x + 760) / 30) * smooth((980 - x) / 30) * smooth((z - 560) / 30);
+  return quiet(x, z) * smooth((x + 330) / 20) * smooth((430 - x) / 20) * smooth((z - 600) / 30);
+}
+/** Liman havuzunun içi mi (mendireklerin iç tarafı)? */
+export function inBasin(x, z) {
+  return x > HAFEN.x0 && x < HAFEN.x1 && z > HAFEN.z0 && z < HAFEN.z1;
 }
 
 // --- deniz tabanı: gelgit (gelgit seviyesi deniz.js; ortalama 0, ±~0,9 m) ---
 /** Tuzlu bataklık yüksekliği (mutlak): bahar gelgitinin yüksek suyunda kısmen su basar. */
 export const SALZWIESE_Y = 0.72;
 /** Watt düzlüğünün yüksekliği (mutlak): alçak suda kurur. */
-export const WATT_Y = -0.5;
+export const WATT_Y = -0.3;
 
 // Priele: Watt'ta alçak suda da ıslak kalan kıvrımlı kanallar (yaklaşık polilinler; genişlik ve derinlik).
 const PRIELE = [
@@ -434,7 +440,7 @@ function seabed(x, z, L) {
   const north = z < BODY.z ? smooth((BODY.z - z) / 400) : 0; // ada ekseninin kuzeyi açık deniz
   const open = Math.max(-14, -0.4 + L * 0.06);
   const pd = prielDist(x, z);
-  let watt = WATT_Y + fbm(x / 140, z / 140, 23) * 0.22;
+  let watt = WATT_Y + fbm(x / 140, z / 140, 23) * 0.18;
   if (pd < 2.2) watt = Math.min(watt, -0.5 - 2.4 * smooth(1 - (pd - 0.6) / 1.6));
   const sb = ((x - SEEHUNDBANK.x) / SEEHUNDBANK.rx) ** 2 + ((z - SEEHUNDBANK.z) / SEEHUNDBANK.rz) ** 2;
   if (sb < 1) watt = Math.max(watt, -0.15 + 0.12 * smooth(1 - sb));
@@ -450,9 +456,12 @@ export function terrainHeight(x, z) {
   const q = quay(x, z);
   let h = FLAT_Y + naturalHeight(x, z) * (1 - f) * (1 - q * smooth((45 - L) / 25)) + deichHeight(x, z);
   if (q > 0.9) {
-    // Rıhtım: kıyı çizgisinin 0,5 m içine kadar tam yükseklik, sonra duvarın dibine (havuz tabanı −1,0).
+    // Rıhtım: kıyı çizgisinin 0,5 m içine kadar tam yükseklik, sonra duvarın dibine. Havuz: feribot ve
+    // Versorgungshafen tarafı taranmış (−3,5), Kutterhafen tarafı (x < kutterX) sığ (−1,1: bahar gelgitinin alçak
+    // suyunda kutter'lar çamura oturur); havuz dışındaki rıhtım önü −2.
     const t = clamp((0.5 - L) / 0.2, 0, 1);
-    return L >= 0.5 ? h : h * (1 - t) - 1.0 * t + Math.min(0, L) * 0.02;
+    const floor = inBasin(x, z) ? (x < HAFEN.kutterX - 20 ? -1.1 : x < HAFEN.kutterX + 20 ? -1.1 - 2.4 * smooth((x - HAFEN.kutterX + 20) / 40) : -3.5) : -2;
+    return L >= 0.5 ? h : h * (1 - t) + floor * t;
   }
   const southSide = z > BODY.z;
   if (southSide && deichAt(x) > 0.05 && L >= 0) {
@@ -464,13 +473,21 @@ export function terrainHeight(x, z) {
       return (h * (1 - s) + marsh * s) * w * edge + (1 - w * edge) * (L < 6 ? WATT_Y + 1.2 * smooth(L / 6) : h);
     }
   }
-  const band = southSide ? 30 : 95; // kuzeyde geniş kumsal (gelgitle su çizgisi ~50 m oynar)
-  if (L >= band) return h;
-  if (L >= 0) {
-    const t = 1 - L / band;
-    return h * (1 - smooth(t)) + (southSide ? 0.1 : -0.2) * t;
+  if (!southSide) {
+    // Kumsal: su kenarından (L = 0, −0,6) kumul eteğine (L = 95, +1,8) yükselir; ortalama su L ≈ 17'de, bahar
+    // gelgitinin yüksek suyu (+0,9) L ≈ 52'de. Strandkorb'lar L ≥ 65'te (layout.js). Ötesi kumul arazisine karışır.
+    const BAND = 95;
+    if (L >= 0 && L < BAND + 40) {
+      const beach = -0.6 + 2.4 * Math.pow(Math.min(1, L / BAND), 0.8);
+      const t = smooth((L - BAND) / 40);
+      return beach * (1 - t) + Math.max(h, beach) * t;
+    }
+  } else if (L >= 0 && L < 30) {
+    const t = 1 - L / 30;
+    return h * (1 - smooth(t)) + 0.1 * t;
   }
-  return Math.max(seabed(x, z, L), southSide ? -12 : -14) + (L > -40 ? 0 : 0);
+  if (L < 0 && !southSide) return Math.max(-14, Math.min(-0.6 + L * 0.05, seabed(x, z, L)));
+  return Math.max(seabed(x, z, L), southSide ? -12 : -14);
 }
 
 // --- geçici uyum (Aşama 5'te kaldırılacak): Driftwood yerleşim kodunun beklediği adlar ---

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>TikTok connection</title>
+<title>TikTok-Verbindung</title>
 <style>
   :root { --ink: #2f3b52; --bg: #f4f7fb; --card: #fff; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink: #eef2fa; --bg: #1b2440; --card: #26304d; } }
@@ -16,20 +16,20 @@
 </head>
 <body>
 <main>
-  <h1>TikTok connection</h1>
-  <p id="msg">This page is only for connecting Driftwood Island's video upload tool to our own TikTok account.</p>
+  <h1>TikTok-Verbindung</h1>
+  <p id="msg">Diese Seite dient nur dazu, das Video-Upload-Werkzeug der Insel Wattenoog mit unserem eigenen TikTok-Konto zu verbinden.</p>
   <code id="code" hidden></code>
 </main>
 <script>
   // TikTok izin ekranından dönüşte gelen kod: video yükleme aracına (Mac) bir kez verilir, karşılığında belirteç alınır.
   const q = new URLSearchParams(location.search);
   if (q.get("code")) {
-    document.getElementById("msg").textContent = "Access granted. Copy this code into the upload tool (it expires in a few minutes):";
+    document.getElementById("msg").textContent = "Zugriff erteilt. Kopiere diesen Code in das Upload-Werkzeug (er läuft in wenigen Minuten ab):";
     const c = document.getElementById("code");
     c.hidden = false;
     c.textContent = q.get("code");
   } else if (q.get("error")) {
-    document.getElementById("msg").textContent = "TikTok access was not granted: " + q.get("error");
+    document.getElementById("msg").textContent = "Der TikTok-Zugriff wurde nicht erteilt: " + q.get("error");
   }
 </script>
 </body>

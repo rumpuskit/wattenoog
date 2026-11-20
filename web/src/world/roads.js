@@ -268,8 +268,8 @@ export function stations(pts, d0, d1, piece = PIECE) {
 export function buildRoads(world) {
   const net = world.network;
   const ground = (x, z) => world.surfaceY(x, z);
-  const M = { asfalt: new Mesh(), parke: new Mesh(), toprak: new Mesh(), tas: new Mesh(), tahta: new Mesh(), tugla: new Mesh(), walk: new Mesh(), walkBrick: new Mesh(), curb: new Mesh(), mark: new Mesh() };
-  const TILE = { asfalt: 8, parke: 4, toprak: 6, tas: 5, tahta: 3, tugla: 3 };
+  const M = { asfalt: new Mesh(), parke: new Mesh(), toprak: new Mesh(), tas: new Mesh(), tahta: new Mesh(), tugla: new Mesh(), klinker: new Mesh(), walk: new Mesh(), walkBrick: new Mesh(), curb: new Mesh(), mark: new Mesh() };
+  const TILE = { asfalt: 8, parke: 4, toprak: 6, tas: 5, tahta: 3, tugla: 3, klinker: 3 };
   const lampSpots = [];
   const doors = world.buildings.map((b) => [b.x + Math.sin(b.rot) * (b.d / 2), b.z + Math.cos(b.rot) * (b.d / 2)]);
   const nearDoor = (x, z) => doors.some(([dx, dz]) => Math.abs(dx - x) < 3 && Math.abs(dz - z) < 3);
@@ -445,13 +445,14 @@ export function buildRoads(world) {
     tas: M.tas.build(mat(T.slabs())),
     tahta: M.tahta.build(mat(T.planks(), { roughness: 0.95 })),
     tugla: M.tugla.build(mat(T.brickPaving())),
+    klinker: M.klinker.build(mat(T.klinkerPaving())),
     walk: M.walk.build(mat(T.paving())),
     walkBrick: M.walkBrick.build(mat(T.brickPaving())),
     curb: M.curb.build(mat(T.curb(), { side: THREE.DoubleSide })),
     mark: M.mark.build(new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 })),
   };
   for (const m of Object.values(meshes)) group.add(m);
-  group.userData.groundMaterials = [meshes.asfalt, meshes.parke, meshes.toprak, meshes.tas, meshes.tahta, meshes.tugla, meshes.walk, meshes.walkBrick, meshes.mark].map((m) => m.material);
+  group.userData.groundMaterials = [meshes.asfalt, meshes.parke, meshes.toprak, meshes.tas, meshes.tahta, meshes.tugla, meshes.klinker, meshes.walk, meshes.walkBrick, meshes.mark].map((m) => m.material);
   const lamps = buildLamps(lampSpots);
   group.add(lamps);
   group.userData.lampHeads = lamps.userData.heads;

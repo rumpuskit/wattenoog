@@ -16,14 +16,14 @@ export const SECENEK = {
   koltuk: ["#7a8fb8", "#c96f62", "#6f9a72", "#d9a441", "#8a6fb0", "#4f5560"],
   perde: ["#ffffff", "#f2c9cf", "#cfe3f2", "#f5e3a8", "#c9e4c5", "#e0d2f0"],
   cicek: ["yok", "sardunya", "lavanta", "papatya", "begonvil", "kaktus"],
-  evcil_ad: ["Biscuit", "Luna", "Max", "Pepper", "Scout", "Maple", "Captain", "Pickles", "Daisy", "Cooper", "Bailey", "Rosie",
-    "Buddy", "Ginger", "Oliver", "Mittens", "Sunny", "Peanut", "Shadow", "Cocoa", "Penny", "Tucker", "Willow", "Murphy",
-    "Hazel", "Skipper", "Clover", "Gus", "Marley", "Waffles"],
+  evcil_ad: ["Mila", "Paul", "Luna", "Bruno", "Frieda", "Krümel", "Lotte", "Momo", "Smilla", "Kalle", "Hein", "Fiete",
+    "Ella", "Socke", "Emma", "Moritz", "Pünktchen", "Jette", "Matti", "Flocke", "Ole", "Tilda", "Kasimir", "Wilma",
+    "Pepe", "Nala", "Knut", "Lilli", "Balu", "Wuschel"],
   etkinlik: ["piknik", "tepe_yuruyus", "plaj_yuruyus", "kosu", "gun_batimi", "vapur", "kiyi_balik", "kapi_onu", "yildiz",
-    "kahvehane", "kafe", "carsi", "ucurtma", "fotograf", "tas", "meydan_sohbet"],
+    "kahvehane", "kafe", "carsi", "ucurtma", "fotograf", "tas", "meydan_sohbet", "deich_spaziergang", "watt_yuruyus"],
 };
 // Anketler: günün olayı (yarın; pazartesi–perşembe günleri) ve haftalık cumartesi filmi.
-export const TEMA_SECENEK = ["ucurtma", "gunbatimi", "balik", "temizlik", "yildiz", "tavla", "komsuluk"];
+export const TEMA_SECENEK = ["wattwanderung", "bosseln", "kutter", "klonschnack", "gunbatimi", "yildiz", "ucurtma", "temizlik", "sandburg", "komsuluk"];
 export const FILM_SECENEK = ["komedi", "macera", "korku", "animasyon"];
 
 const HANDLE = /^[a-z0-9._]{2,24}$/;
@@ -49,7 +49,7 @@ async function sha(text) {
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 const rand = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, "0")).join("");
-/** Adanın takvim günü (ABD Doğu saati, yaz saatli; sitedeki sim.dayOf ile aynı kural). */
+/** Adanın takvim günü (Berlin saati, AB yaz saatli; sitedeki sim.dayOf ile aynı kural). */
 const trDay = (ms = Date.now()) => new Date(dayOf(ms / 1000) * DAY).toISOString().slice(0, 10);
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 
@@ -103,7 +103,7 @@ export class Kayit extends DurableObject {
 
     if (path === "/api/dogrula" && request.method === "POST") {
       const handle = String(body.handle ?? "").toLowerCase().replace(/^@/, "").trim();
-      if (!HANDLE.test(handle)) return json({ hata: "Invalid username" }, 400);
+      if (!HANDLE.test(handle)) return json({ hata: "Ungültiger Benutzername" }, 400);
       // Cihaz anahtarı varsa korunur: aynı cihazın eski kodları da geçerli kalır (kişi eski kodu yazmış olabilir).
       const tokIn = (request.headers.get("authorization") ?? "").replace(/^Bearer /, "");
       let token = /^[0-9a-f]{64}$/.test(tokIn) ? tokIn : null;
@@ -116,7 +116,7 @@ export class Kayit extends DurableObject {
           return json({ kod: ayni.kod, token, handle });
         }
       }
-      if (!this.limit(`d:${ipKey}`, 6, HOUR)) return json({ hata: "Too many tries; please try again in a bit" }, 429);
+      if (!this.limit(`d:${ipKey}`, 6, HOUR)) return json({ hata: "Zu viele Versuche. Bitte versuch es gleich noch einmal." }, 429);
       let kod;
       for (let n = 0; n < 40; n++) {
         kod = String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
@@ -190,23 +190,23 @@ export class Kayit extends DurableObject {
     }
     if (path === "/api/tercih" && request.method === "POST") {
       const handle = await this.who(request);
-      if (!handle) return json({ hata: "Please verify first" }, 401);
-      if (!this.limit(`t:${handle}`, 60, HOUR)) return json({ hata: "That was a lot of changes; please try again in a bit" }, 429);
+      if (!handle) return json({ hata: "Bitte bestätige zuerst, dass du es bist" }, 401);
+      if (!this.limit(`t:${handle}`, 60, HOUR)) return json({ hata: "Das waren viele Änderungen. Bitte versuch es gleich noch einmal." }, 429);
       const old = JSON.parse(this.sql.exec("SELECT veri FROM tercih WHERE handle = ?", handle).toArray()[0]?.veri ?? "{}");
       const v = { ...old };
       for (const k of ["duvar", "koltuk", "perde", "cicek", "evcil_ad"]) {
         if (body[k] === null) delete v[k];
-        else if (body[k] != null) { if (!SECENEK[k].includes(body[k])) return json({ hata: `Invalid option: ${k}` }, 400); v[k] = body[k]; }
+        else if (body[k] != null) { if (!SECENEK[k].includes(body[k])) return json({ hata: `Ungültige Auswahl: ${k}` }, 400); v[k] = body[k]; }
       }
       if (body.gun !== undefined) {
-        // Günün etkinliği ve buluşma: yalnız o güne (Türkiye takvimi) geçerli.
+        // Günün etkinliği ve buluşma: yalnız o güne (ada takvimi, Berlin) geçerli.
         const g = body.gun;
         if (g === null) delete v.gun;
         else {
-          if (!g || !TARIH.test(g.tarih) || (g.tarih !== trDay() && g.tarih !== trDay(now + DAY))) return json({ hata: "Invalid day" }, 400);
-          if (g.etkinlik != null && !SECENEK.etkinlik.includes(g.etkinlik)) return json({ hata: "Invalid activity" }, 400);
+          if (!g || !TARIH.test(g.tarih) || (g.tarih !== trDay() && g.tarih !== trDay(now + DAY))) return json({ hata: "Ungültiger Tag" }, 400);
+          if (g.etkinlik != null && !SECENEK.etkinlik.includes(g.etkinlik)) return json({ hata: "Ungültige Aktivität" }, 400);
           const bul = g.bulusma == null ? null : String(g.bulusma).toLowerCase().replace(/^@/, "");
-          if (bul != null && (!HANDLE.test(bul) || bul === handle)) return json({ hata: "Invalid meetup" }, 400);
+          if (bul != null && (!HANDLE.test(bul) || bul === handle)) return json({ hata: "Ungültiges Treffen" }, 400);
           v.gun = { tarih: g.tarih, ...(g.etkinlik ? { etkinlik: g.etkinlik } : {}), ...(bul ? { bulusma: bul } : {}) };
         }
       }
@@ -232,23 +232,23 @@ export class Kayit extends DurableObject {
     }
     if (path === "/api/anket" && request.method === "POST") {
       const id = String(body.id ?? ""), secim = String(body.secim ?? ""), cihaz = String(body.cihaz ?? "");
-      if (!/^[0-9a-f]{32}$/.test(cihaz)) return json({ hata: "Invalid device" }, 400);
+      if (!/^[0-9a-f]{32}$/.test(cihaz)) return json({ hata: "Ungültiges Gerät" }, 400);
       const m = id.match(/^(tema):(\d{4}-\d{2}-\d{2})$|^(film):(\d{4}-W\d{2})$/);
-      if (!m) return json({ hata: "Invalid poll" }, 400);
+      if (!m) return json({ hata: "Ungültige Umfrage" }, 400);
       // Günün olayı anketi yalnız ertesi gün için ve o günden önce açık; film anketi haftası boyunca.
-      if (m[1] === "tema" && m[2] !== trDay(now + DAY)) return json({ hata: "This poll is closed" }, 400);
+      if (m[1] === "tema" && m[2] !== trDay(now + DAY)) return json({ hata: "Diese Umfrage ist geschlossen" }, 400);
       const opts = m[1] === "tema" ? TEMA_SECENEK : FILM_SECENEK;
-      if (!opts.includes(secim)) return json({ hata: "Invalid option" }, 400);
-      if (!this.limit(`a:${id}:${ipKey}`, 5, DAY)) return json({ hata: "Enough votes from this network for this poll" }, 429);
+      if (!opts.includes(secim)) return json({ hata: "Ungültige Auswahl" }, 400);
+      if (!this.limit(`a:${id}:${ipKey}`, 5, DAY)) return json({ hata: "Aus diesem Netz wurde für diese Umfrage schon genug abgestimmt" }, 429);
       this.sql.exec("INSERT OR REPLACE INTO anket_oy VALUES (?, ?, ?, ?)", id, cihaz, secim, now);
       return json({ ok: true });
     }
     if (path === "/api/bulundu") {
       const gun = request.method === "POST" ? String(body.gun ?? "") : url.searchParams.get("gun") ?? "";
-      if (!TARIH.test(gun)) return json({ hata: "Invalid day" }, 400);
+      if (!TARIH.test(gun)) return json({ hata: "Ungültiger Tag" }, 400);
       if (request.method === "POST") {
         const cihaz = String(body.cihaz ?? "");
-        if (!/^[0-9a-f]{32}$/.test(cihaz) || gun !== trDay()) return json({ hata: "Invalid" }, 400);
+        if (!/^[0-9a-f]{32}$/.test(cihaz) || gun !== trDay()) return json({ hata: "Ungültig" }, 400);
         if (this.limit(`b:${gun}:${ipKey}`, 5, DAY)) this.sql.exec("INSERT OR IGNORE INTO bulunan VALUES (?, ?)", gun, cihaz);
         this.sql.exec("DELETE FROM bulunan WHERE gun < ?", trDay(now - 40 * DAY));
       }
@@ -257,11 +257,11 @@ export class Kayit extends DurableObject {
     if (path === "/api/secim" && request.method === "POST") {
       // Siteden adaylık ya da oy (doğrulanmış sakin). Sunucu seçim kurallarını uygular (adada oturma, süre).
       const handle = await this.who(request);
-      if (!handle) return json({ hata: "Please verify first" }, 401);
+      if (!handle) return json({ hata: "Bitte bestätige zuerst, dass du es bist" }, 401);
       if (body.aday === true) this.sql.exec("INSERT OR REPLACE INTO secim_oy VALUES (?, 'aday', NULL, ?)", handle, now);
       else {
         const aday = String(body.oy ?? "").toLowerCase().replace(/^@/, "");
-        if (!HANDLE.test(aday)) return json({ hata: "Invalid candidate" }, 400);
+        if (!HANDLE.test(aday)) return json({ hata: "Ungültige Kandidatur" }, 400);
         this.sql.exec("INSERT OR REPLACE INTO secim_oy VALUES (?, 'oy', ?, ?)", handle, aday, now);
       }
       return json({ ok: true });

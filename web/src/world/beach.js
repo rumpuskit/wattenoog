@@ -1,8 +1,9 @@
-// Driftwood Plajı'nın çizimi (düzen: layout.js _layoutBeach): şemsiye kümeleri ve şezlonglar, kumsala inen tahta
-// yollar, duşlar, soyunma kabinleri, plaj voleybolu, yüzme alanı şamandıraları ve cankurtaran kulesi. Hepsi
-// renkli köşeli tek geometrilerde birleşir (az çizim çağrısı); şamandıralar dalgayla hafifçe iner kalkar.
+// Hauptstrand'ın çizimi (düzen: layout.js _layoutBeach/_layoutStrandkoerbe): numaralı Strandkorb sıraları (hasır gövde,
+// çizgili kumaş, tahta taban), plaj voleybolu, yüzme alanı şamandıraları ve Rettungsturm. Hepsi renkli köşeli tek
+// geometrilerde birleşir (az çizim çağrısı); şamandıralar dalgayla hafifçe iner kalkar.
 import * as THREE from "three";
 import { box, colored, cyl, merged, MAT } from "./harbor.js";
+import { tide } from "./gelgit.js";
 
 const CANOPY = [["#e05a4a", "#f7f5f0"], ["#2f7fb5", "#f7f5f0"], ["#f2c14e", "#e8653a"], ["#3e8a86", "#f7f5f0"], ["#d98ca0", "#f7f5f0"]];
 const MATTRESS = ["#2f7fb5", "#e05a4a", "#3e8a86", "#f2c14e", "#f7f5f0"];
@@ -48,16 +49,35 @@ export function buildBeach(world) {
     }
     parts.push(cyl(0.06, 0.06, 0.1, x, y + 2.7, z, "#f7f5f0", 6));
   };
-  B.clusters.forEach((c, i) => {
+  (B.clusters ?? []).forEach((c, i) => {
     umbrella(c.x, c.z, c.c);
     for (const side of [-1, 1]) {
       const [sx, sz] = off(c.x, c.z, side * 1.0, 0);
       sunbed(sx, sz, pick(MATTRESS, c.c + (side > 0 ? 1 : 0) + i));
     }
   });
+  // Strandkorb: tahta kızak taban, hasır gövde (iki kişilik oturak), üstte yarım silindir tente, içi çizgili kumaş
+  // (beyaz + renk), yanlarda kol dayanakları, arkada numara levhası. Denize bakar.
+  const STOFF = ["#2f6fb0", "#c0392b", "#2e8b57", "#e2a531"];
+  const korb = (x, z, c, nr) => {
+    const y = gy(x, z), st = STOFF[c % STOFF.length], wicker = "#d4c08e", wick2 = "#c7b27c";
+    const g = [
+      box(1.34, 0.16, 0.9, 0, 0.08, 0, "#8a6a4a"), // taban kızakları
+      box(1.3, 0.42, 0.86, 0, 0.37, 0.02, wicker), // oturak gövdesi
+      box(1.3, 0.95, 0.16, 0, 1.0, -0.36, wick2), // arka
+      box(0.12, 0.95, 0.72, -0.59, 1.0, 0.02, wicker), box(0.12, 0.95, 0.72, 0.59, 1.0, 0.02, wicker), // yanlar
+      box(0.14, 0.08, 0.5, -0.66, 0.78, 0.16, "#b39a6a"), box(0.14, 0.08, 0.5, 0.66, 0.78, 0.16, "#b39a6a"), // kol dayanakları
+      colored(new THREE.CylinderGeometry(0.66, 0.66, 0.86, 10, 1, false, -Math.PI / 2, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2).scale(1, 0.55, 1).translate(0, 1.48, 0.02), wick2), // tente
+      box(1.06, 0.06, 0.62, 0, 0.6, 0.1, st), // minder
+    ];
+    for (let k = 0; k < 6; k++) g.push(box(0.16, 0.86, 0.02, -0.45 + k * 0.18, 1.02, -0.27, k % 2 ? "#f7f5f0" : st)); // içte çizgili kumaş
+    g.push(box(0.32, 0.18, 0.02, 0, 1.25, -0.45, "#f7f5f0")); // numara levhası (arkada)
+    parts.push(...g.map((p) => place(p, x, y, z, rot)));
+  };
+  for (const k of B.koerbe ?? []) korb(k.x, k.z, k.c, k.nr);
 
   // Tahta yollar: kumsala inen 1,6 m genişlikte döşeme (tahtalar enine), kenar kirişleri.
-  for (const { a, b } of B.walks) {
+  for (const { a, b } of B.walks ?? []) {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]), wr = Math.atan2(b[0] - a[0], b[1] - a[1]);
     const n = Math.floor(len / 0.32);
     for (let k = 0; k < n; k++) {
@@ -70,7 +90,7 @@ export function buildBeach(world) {
     }
   }
   // Duş: paslanmaz boru, başlık, ahşap ızgara, musluk.
-  for (const [x, z] of B.showers) {
+  for (const [x, z] of B.showers ?? []) {
     const y = gy(x, z);
     parts.push(place(box(1.1, 0.06, 1.1, 0, 0.03, 0, "#a87a50"), x, y, z, rot));
     parts.push(cyl(0.05, 0.05, 2.4, x, y + 1.2, z, "#c9ced4", 8));
@@ -80,7 +100,7 @@ export function buildBeach(world) {
     parts.push(place(box(0.12, 0.08, 0.12, 0, 1.0, 0.07, "#2f7fb5"), x, y, z, rot));
   }
   // Soyunma kabinleri: beyaz gövde, renkli çizgili kapı, saçak; denize bakar.
-  B.cabins.forEach(([x, z], i) => {
+  (B.cabins ?? []).forEach(([x, z], i) => {
     const y = gy(x, z);
     const col = ["#2f7fb5", "#e05a4a", "#3e8a86", "#f2c14e"][i % 4];
     const g = [box(1.4, 2.2, 1.4, 0, 1.1, 0, "#f7f5f0")];
@@ -89,7 +109,7 @@ export function buildBeach(world) {
     parts.push(...g.map((p) => place(p, x, y, z, rot)));
   });
   // Çöp kutuları (plaj tipi, mavi).
-  for (const [x, z] of B.bins) {
+  for (const [x, z] of B.bins ?? []) {
     const y = gy(x, z);
     parts.push(cyl(0.28, 0.26, 0.85, x, y + 0.42, z, "#2f7fb5", 10), cyl(0.3, 0.3, 0.06, x, y + 0.87, z, "#f7f5f0", 10));
   }
@@ -136,15 +156,20 @@ export function buildBeach(world) {
   });
   group.add(floats);
   const rope = new THREE.BufferGeometry().setFromPoints(B.buoys.map(([x, z]) => new THREE.Vector3(x, 0.05, z)));
-  group.add(new THREE.Line(rope, new THREE.LineBasicMaterial({ color: "#f7f5f0" })));
-  const base = B.buoys.map(([x, z]) => [x, z]);
+  const ropeLine = new THREE.Line(rope, new THREE.LineBasicMaterial({ color: "#f7f5f0" }));
+  group.add(ropeLine);
+  // Şamandıralar gelgitle iner kalkar; alçak suda dibe değince kumda durur.
+  const base = B.buoys.map(([x, z]) => [x, z, world.height(x, z) + 0.15]);
   group.userData.tick = (t) => {
-    base.forEach(([x, z], i) => {
+    const lv = tide();
+    base.forEach(([x, z, bed], i) => {
       const big = i === 0 || i === base.length - 1;
-      m4.makeScale(big ? 2.4 : 1, big ? 2.4 : 1, big ? 2.4 : 1).setPosition(x, 0.05 + 0.06 * Math.sin(t * 1.3 + i * 0.7), z);
+      const y = Math.max(bed, lv + 0.05 + 0.06 * Math.sin(t * 1.3 + i * 0.7));
+      m4.makeScale(big ? 2.4 : 1, big ? 2.4 : 1, big ? 2.4 : 1).setPosition(x, y, z);
       floats.setMatrixAt(i, m4);
     });
     floats.instanceMatrix.needsUpdate = true;
+    ropeLine.position.y = Math.max(0, lv);
   };
   return group;
 }

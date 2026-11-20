@@ -10,6 +10,7 @@
 // (kelimeler: [[kelime, başlangıç sn], ...]; çekim geçişlerini kelimeye oturtmak için).
 // Ses ve ayarlar anlatım standardından (video/cikti/ANLATIM-STANDARDI.md, bölüm 7): değişirse orada da değişir.
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -31,7 +32,9 @@ export async function seslendir(S) {
   mkdirSync(out, { recursive: true });
   const parts = S.seslendirme.map((c) => c.ses.trim());
   const text = parts.join(" ");
-  const anahtar = createHash("sha256").update(JSON.stringify({ text, ...SES })).digest("hex").slice(0, 16);
+  // SES_YEREL=1: kredisiz deneme sesi (macOS `say`, Almanca "Reed"). Anahtarı ayrı: gerçek üretim bu sesi asla kullanmaz.
+  const yerel = process.env.SES_YEREL === "1";
+  const anahtar = createHash("sha256").update(JSON.stringify({ text, ...SES, ...(yerel ? { yerel: "say-reed" } : {}) })).digest("hex").slice(0, 16);
   const jsonPath = `${out}/ses.json`;
   if (existsSync(jsonPath) && existsSync(`${out}/ses.mp3`)) {
     const eski = JSON.parse(readFileSync(jsonPath, "utf8"));
@@ -42,6 +45,7 @@ export async function seslendir(S) {
       return eski;
     }
   }
+  if (yerel) return yerelSes(S, out, parts, anahtar, jsonPath);
   if (!SES.voice) throw new Error("anlatıcı sesi seçilmedi: seslendir.mjs ANLATICI_SESI boş (TODO; kullanıcı ElevenLabs'ten Almanca ses seçecek). Seslendirme yapılmadı, kredi harcanmadı.");
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) throw new Error("ELEVENLABS_API_KEY yok (seslendirme değişti, yeniden üretilmeli)");
@@ -70,6 +74,32 @@ export async function seslendir(S) {
   const sure = al.character_end_times_seconds.at(-1);
   const result = { anahtar, sure, cumleler };
   writeFileSync(jsonPath, JSON.stringify(result, null, 2));
+  return result;
+}
+
+// Kredisiz deneme sesi: her cümle `say` ile ayrı üretilir, aralarına 0,25 sn sessizlik; kelime zamanları cümle içinde
+// karakter oranıyla. Yalnız altyapı denemesi için (ses kalitesi önemsiz, zamanlama gerçeğe yakın).
+function yerelSes(S, out, parts, anahtar, jsonPath) {
+  const tmp = `${out}/yerel-ses`;
+  mkdirSync(tmp, { recursive: true });
+  const ARA = 0.25, liste = [];
+  let t = 0;
+  const cumleler = parts.map((p, k) => {
+    const f = `${tmp}/c${k}.aiff`;
+    execFileSync("say", ["-v", "Reed", "-r", "190", "-o", f, p]);
+    const d = Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).toString().trim());
+    const bas = t, son = t + d;
+    const kelimeler = [...p.matchAll(/[^\s]+/g)].map((m) => [m[0], +(bas + (d * m.index) / p.length).toFixed(3)]);
+    liste.push(`file '${f}'`, `file '${tmp}/ara.aiff'`);
+    t = son + ARA;
+    return { yazi: S.seslendirme[k].yazi ?? p, bas, son, kelimeler };
+  });
+  execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=22050:cl=mono", "-t", String(ARA), `${tmp}/ara.aiff`]);
+  writeFileSync(`${tmp}/liste.txt`, liste.join("\n"));
+  execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", `${tmp}/liste.txt`, "-ar", "44100", "-ac", "1", "-b:a", "192k", `${out}/ses.mp3`]);
+  const result = { anahtar, sure: cumleler.at(-1).son, cumleler, yerel: true };
+  writeFileSync(jsonPath, JSON.stringify(result, null, 2));
+  console.log("UYARI: SES_YEREL=1, deneme sesi (macOS say), ElevenLabs kullanılmadı");
   return result;
 }
 

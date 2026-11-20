@@ -1,5 +1,5 @@
 // 1. video (açılış, sesli, Almanca): denizden bomboş adaya alçalış ("Auf dieser Insel wohnt niemand.") → setteki
-// koyunlar ("Nur Schafe.") → alacakaranlıkta fener (8. sakin, "Gefragt wird niemand.") → ilk adres (sim'den: slot 0) →
+// koyunlar ("Nur Schafe.") → alacakaranlıkta fener (8. sakin; yorumla başka meslek istemediyse, sim.js jobOf) → ilk adres (sim'den: slot 0) →
 // büyüme montajı (gelişim tablosundan: Fischbude, Bäckerei, Kirche, Kurhaus; kesmeler kelimelere oturur) → `gelisim=3000`
 // ile dolu ada ("So wird sie.") → soru + kapanış kalıbı (feribot, "@du" etiketli sakin, boş ada).
 // Çekim süreleri seslendirmenin cümle/kelime zamanlarından hesaplanır (cikti/01-acilis/ses.json; yoksa önce
@@ -38,17 +38,18 @@ const SESLENDIRME = [
   { ses: "Nur Schafe." },                                                                              // 1
   { ses: "Der Leuchtturm wartet schon." },                                                             // 2
   { ses: `Nummer ${EINS[fenerNo] ?? fenerNo} bekommt ihn.`, yazi: `Nummer ${fenerNo} bekommt ihn.` }, // 3
-  { ses: "Gefragt wird niemand." },                                                                    // 4
-  { ses: `Wer uns zuerst folgt, bekommt ${adresSes}.`, yazi: `Wer uns zuerst folgt,\nbekommt ${ilkAdres}.` }, // 5
+  { ses: "Außer, du wünschst dir was anderes." },                                                                    // 4
+  // Eski hesap (1.059 takipçi): ilk ev ilk TAKİP edene değil ilk TAŞINANA (yeni takipçi ya da "einziehen" yazan eski takipçi).
+  { ses: `Wer als Erstes einzieht, bekommt ${adresSes}.`, yazi: `Wer als Erstes einzieht,\nbekommt ${ilkAdres}.` }, // 5
   { ses: "Mit jedem neuen Menschen kommt etwas dazu.", yazi: "Mit jedem neuen Menschen\nkommt etwas dazu." }, // 6
   { ses: "Eine Fischbude. Eine Bäckerei. Eine Kirche. Ein Kurhaus.", yazi: "Eine Fischbude. Eine Bäckerei.\nEine Kirche. Ein Kurhaus." }, // 7
   { ses: "So wird sie." },                                                                             // 8
-  { ses: "Wer zieht als Erstes ein?" },                                                                // 9
+  { ses: "Wer macht den Anfang?" },                                                                    // 9
   { ses: "Folg uns, dann ziehst du auf die Insel.", yazi: "Folg uns, dann ziehst du\nauf die Insel." }, // 10
   { ses: "Such dir deinen Beruf aus." },                                                               // 11
   { ses: "Schreib: Beruf, Fischerei.", yazi: "Schreib:\nBeruf: Fischerei" },                           // 12
 ];
-const ARALAR = { 1: 0.35, 4: 0.35, 9: 0.2 }; // vuruş öncesi sessizlik ("Nur Schafe.", "Gefragt wird niemand.")
+const ARALAR = { 1: 0.35, 4: 0.35, 9: 0.2 }; // vuruş öncesi sessizlik ("Nur Schafe.", "Außer, …")
 
 const sesYolu = resolve(HERE, "../cikti", AD, "ses.json");
 const ses = existsSync(sesYolu) ? JSON.parse(readFileSync(sesYolu, "utf8")) : null;
@@ -151,6 +152,7 @@ export default {
   // Açıklama: adres (URL) yok, tam 5 hashtag (havuzdan; ilk günlük videolar etiket.mjs ile bunlardan kaçınır).
   aciklama: `Auf dieser Insel wohnt noch niemand. Nur Schafe 🐑
 Folg uns, dann ziehst du ein: dein Haus, dein Beruf, dein Tag. Live auf der Insel.
+Du folgst schon länger? Schreib „einziehen“ in die Kommentare.
 Wer zieht als Erstes ein? 👇 Such dir deinen Beruf aus: Schreib „Beruf: Fischerei“ (oder einen anderen).
 
 #nordsee #inselleben #simulation #leuchtturm #moin`,

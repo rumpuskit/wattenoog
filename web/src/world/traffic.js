@@ -1029,7 +1029,7 @@ export class Vehicles {
 }
 
 /** Trafik ışıkları: her ışıklı kavşak kolunda, dur çizgisinin sağ köşesinde direk ve üç lamba. */
-/** STOP levhaları: ışıksız kavşaklarda (en az üç taşıt kolu) mahalle sokaklarından gelenin sağında, kırmızı sekizgen. */
+/** "Vorfahrt achten" levhaları: ışıksız kavşaklarda (en az üç taşıt kolu) mahalle sokaklarından gelenin sağında. */
 function buildStopSigns(traffic, world) {
   const spots = [];
   for (const n of traffic.nodes) {
@@ -1050,13 +1050,10 @@ function buildStopSigns(traffic, world) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = 128;
   const g = cv.getContext("2d");
-  g.fillStyle = "#c8231f";
-  g.beginPath();
-  for (let k = 0; k < 8; k++) { const a = Math.PI / 8 + (k * Math.PI) / 4; g.lineTo(64 + Math.cos(a) * 62, 64 + Math.sin(a) * 62); }
-  g.closePath(); g.fill();
-  g.strokeStyle = "#ffffff"; g.lineWidth = 5; g.stroke();
-  g.fillStyle = "#ffffff"; g.font = "900 38px Nunito, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-  g.fillText("STOP", 64, 66);
+  // "Vorfahrt achten" (Zeichen 205): ters üçgen, kırmızı kenar, beyaz iç.
+  const tri = (r) => { g.beginPath(); g.moveTo(64 - r, 64 - r * 0.58); g.lineTo(64 + r, 64 - r * 0.58); g.lineTo(64, 64 + r * 1.15); g.closePath(); };
+  g.fillStyle = "#c8231f"; tri(60); g.fill();
+  g.fillStyle = "#ffffff"; tri(40); g.fill();
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   const face = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.76, 0.76).translate(0, 2.2, 0.04), new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.3, roughness: 0.6 }), N);

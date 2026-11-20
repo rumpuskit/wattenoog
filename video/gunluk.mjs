@@ -890,7 +890,7 @@ if (dene) {
   if (!cekimler[Number(dene) - 1]) { console.error(`çekim ${dene} yok (1–${cekimler.length})`); process.exit(1); }
 }
 // --- çizim: site derlenir, yerel önizleme sunucusu açılır, kaydet.mjs çalışır ---
-const PORT = Number(process.env.ONIZLEME_PORT) || 4189;
+const PORT = Number(process.env.ONIZLEME_PORT) || 4199;
 execFileSync("npx", ["vite", "build"], { cwd: resolve(HERE, "../web"), stdio: "ignore" });
 const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], { cwd: resolve(HERE, "../web"), stdio: "ignore", detached: true });
 try {

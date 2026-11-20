@@ -1,9 +1,9 @@
 // Günün olayının sitedeki gerçek bilgisi (16 Kasım 2026): plan, yer adı, seyirci sayısı, gazete metni, evre saatleri.
 // Otomatik üretim (social-management mac/ada/uret.sh) gözetimsiz Claude'dan önce çalıştırır, sonucu isteme yazar:
 // videodaki sayılar sitedeki olayla birebir aynı olsun.
-//   node olay-bilgi.mjs [--yuva ogle|aksam] [--olay kaza --olaysaat 08:33] [--port 4186]  → stdout JSON ya da {"olay": null}
+//   node olay-bilgi.mjs [--yuva ogle|aksam] [--olay kaza --olaysaat 08:33] [--port 4196]  → stdout JSON ya da {"olay": null}
 //   --yuva aksam: öğleden sonra olayı (23:30 videosu; 17 Kasım akşamı, günde iki olay).
-// Siteyi derler (vite build) ve kendi önizleme sunucusunu açar (port 4186; üretimin 4189'u ile çakışmaz).
+// Siteyi derler (vite build) ve kendi önizleme sunucusunu açar (port 4196; üretimin 4199'u ile çakışmaz).
 import { chromium } from "playwright-core";
 import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -15,7 +15,7 @@ import { olayGunu, olayEvre } from "../web/src/world/olay-plan.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const opt = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
-const PORT = Number(opt("--port", 4186));
+const PORT = Number(opt("--port", 4196));
 const zorla = opt("--olay", null), zorlaSaat = opt("--olaysaat", null), yuva = opt("--yuva", "ogle") === "aksam" ? 1 : 0;
 sim.setCatalog(JSON.parse(readFileSync(resolve(HERE, "../data/catalog.json"), "utf8")));
 const saat = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(Math.floor(m % 60)).padStart(2, "0")}`;

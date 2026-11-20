@@ -80,6 +80,21 @@ export function buildWorkInterior(b0, f, add0, spot0) {
     return spots;
   }
 
+  // Fischbude (küçük büfe, 8 × 5 m): ön camın arkasında buzlu balık tezgâhı, arkada fritöz ve buzdolabı; masa yok
+  // (müşteri dışarıda, ayakta masalarda).
+  if (kind === "kahvehane" && b.w < 10) {
+    counter(0, hd - 0.75, b.w - 1.0, "#e9edf0", "#cfd6dc");
+    add(b.w - 1.4, 0.04, 0.55, 0, 1.1, hd - 0.75, "#cfe6ef", 0, { shadow: false });
+    for (let k = 0; k < 8; k++) add(0.36, 0.06, 0.12, -hw + 1.0 + k * 0.75, 1.14, hd - 0.75, k % 3 ? "#b8c4cc" : "#d98a6a", 0, { shadow: false });
+    add(1.1, 0.95, 0.6, -hw + 0.95, 0.06, -hd + 0.65, "#c9ced4"); // fritöz
+    add(1.2, 1.9, 0.55, hw - 0.9, 0.06, -hd + 0.6, "#e6e9ec"); // buzdolabı
+    add(2.0, 0.05, 0.35, 0.3, 1.6, -hd + 0.4, "#8a6a52"); // raf
+    S(-1.0, hd - 1.75, 0, "counter");
+    S(1.2, hd - 1.75, 0, "counter");
+    spots.guests = guests;
+    return spots;
+  }
+
   switch (kind) {
     case "kafe": case "kahvehane": case "bufe": case "firin": case "carsi": {
       // Arka duvar boyunca tezgâh; önde masalar. Fırında ekmek rafları ve taş fırın.

@@ -856,31 +856,33 @@ function buildFrontPaths(world) {
       }
     }
   }
-  // Posta kutuları (ev önünde, kaldırım kenarında direkli) ve yangın muslukları (kaldırımda, birkaç evde bir).
-  const mailPost = new Batch(new THREE.BoxGeometry(0.1, 1.05, 0.1).translate(0, 0.52, 0), std("#6b5a48"), { shadow: false });
-  const mailBox = new Batch(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2).translate(0, 1.1, 0), std(0xffffff, { roughness: 0.4, metalness: 0.4 }));
-  const hydrant = new Batch(mergeGeometries([
-    new THREE.CylinderGeometry(0.14, 0.17, 0.6, 10).translate(0, 0.3, 0),
-    new THREE.SphereGeometry(0.15, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.6, 0),
-    new THREE.CylinderGeometry(0.06, 0.06, 0.36, 8).rotateZ(Math.PI / 2).translate(0, 0.42, 0),
-  ]), std("#c8231f", { roughness: 0.45 }));
-  const BOXES = ["#1d1d20", "#1d1d20", "#2f4256", "#8e2f2a", "#f4f1ea"];
+  // Çöp bidonları (ön bahçenin köşesinde, renge göre: gri Restmüll, sarı Gelbe Tonne, mavi Papier, kahve Bio) ve
+  // birkaç evde bir hidrant levhası (beyaz, kırmızı kenarlı "H" levhası; hidrant yer altında).
+  const binBody = new Batch(new THREE.BoxGeometry(0.58, 0.95, 0.72).translate(0, 0.475, 0), std(0xffffff, { roughness: 0.6 }));
+  const binLid = new Batch(new THREE.BoxGeometry(0.62, 0.06, 0.76).translate(0, 0.98, 0.0), std(0xffffff, { roughness: 0.5 }));
+  const hPost = new Batch(new THREE.BoxGeometry(0.06, 1.2, 0.06).translate(0, 0.6, 0), std("#8d949b", { metalness: 0.4 }), { shadow: false });
+  const hSign = new Batch(new THREE.BoxGeometry(0.28, 0.2, 0.02).translate(0, 1.15, 0.04), std("#f4f4f2"), { shadow: false });
+  const TONNEN = ["#5a5f66", "#e2c22e", "#2f5d8a", "#6b4a35"];
   for (const b of world.buildings) {
     if (!b.house || b.house === "mehrfamilienhaus") continue;
     const seed = b.pathSeed ?? 1;
-    const lz = b.d / 2 + b.yard + 0.35, lx = b.w / 2 + 1.0;
-    mailPost.add(local(b, lx, -0.05, lz), b.rot, s.set(1, 1, 1));
-    mailBox.add(local(b, lx, -0.05, lz), b.rot, s.set(1, 1, 1), BOXES[seed % BOXES.length]);
-    if (seed % 5 === 0) {
-      const at = local(b, -b.w / 2 - 1.2, 0, b.d / 2 + b.yard + 1.9).clone();
-      hydrant.add(v.set(at.x, world.groundY(at.x, at.z) - 0.02, at.z), 0, s.set(1, 1, 1));
-      world.addObstacleCircle(at.x, at.z, 0.22);
+    const lz = b.d / 2 + b.yard - 0.6, n = 2 + (seed % 3);
+    for (let k = 0; k < n; k++) {
+      const lx = b.w / 2 + 0.5 - k * 0.7, c = TONNEN[(k + (seed >> 2)) % 4];
+      binBody.add(local(b, lx, -0.02, lz), b.rot, s.set(1, 1, 1), c);
+      binLid.add(local(b, lx, -0.02, lz), b.rot, s.set(1, 1, 1), c);
+      const bp = local(b, lx, 0, lz);
+      world.addObstacleCircle(bp.x, bp.z, 0.4);
     }
-    const mp = local(b, lx, 0, lz);
-    world.addObstacleCircle(mp.x, mp.z, 0.15);
+    if (seed % 6 === 0) {
+      const at = local(b, -b.w / 2 - 1.0, 0, b.d / 2 + b.yard + 0.4).clone();
+      hPost.add(v.set(at.x, world.groundY(at.x, at.z) - 0.02, at.z), b.rot, s.set(1, 1, 1));
+      hSign.add(v.set(at.x, world.groundY(at.x, at.z) - 0.02, at.z), b.rot, s.set(1, 1, 1));
+      world.addObstacleCircle(at.x, at.z, 0.12);
+    }
   }
   const group = new THREE.Group();
-  for (const batch of [gravel, stone, hedge, flowers, mailPost, mailBox, hydrant]) group.add(batch.build());
+  for (const batch of [gravel, stone, hedge, flowers, binBody, binLid, hPost, hSign]) group.add(batch.build());
   return group;
 }
 

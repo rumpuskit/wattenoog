@@ -399,7 +399,8 @@ export function flatness(x, z) {
 
 /** Liman kıyısı rıhtım mı (0..1)? Havuzun duvarları ve iki yanı (x −330…430; ötesi set ve tuzlu bataklık). */
 export function quay(x, z) {
-  return quiet(x, z) * smooth((x + 330) / 20) * smooth((430 - x) / 20) * smooth((z - 600) / 30);
+  // Gürültüsüz (quiet) bölgeye bağlı değil: havuzun kuzey kenarı (z 640) güney kıyısından ~170 m içeride kalıyor.
+  return smooth((x + 330) / 20) * smooth((430 - x) / 20) * smooth((z - 600) / 30) * smooth((320 - Math.abs(z - southShoreZ(x))) / 40);
 }
 /** Liman havuzunun içi mi (mendireklerin iç tarafı)? */
 export function inBasin(x, z) {

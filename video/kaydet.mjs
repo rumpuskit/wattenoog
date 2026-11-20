@@ -1,7 +1,7 @@
 // Senaryodan dikey video üretir: her çekim için siteyi açar, zamanı sanal saate bağlar, kareleri tek tek
 // ilerletip ekran görüntüsünü ffmpeg'e verir; sonunda çekimleri geçişlerle birleştirir.
 //
-//   cd web && npm run build && npx vite preview --port 4183      (ayrı terminalde)
+//   cd web && npm run build && npx vite preview --port 4193      (ayrı terminalde)
 //   cd video && node kaydet.mjs senaryolar/acilis.mjs [--onizleme] [--cekim 2] [--birlestir]
 //
 // Senaryo: { ad, fps, w, h, gecis, seslendirme?, aralar?, muzik?, cekimler: [{ sure, adres, kamera, yazilar, takip, arayuz, hazirlik }] }
@@ -40,7 +40,7 @@ const file = args.find((a) => !a.startsWith("--"));
 const preview = args.includes("--onizleme");
 const only = args.includes("--cekim") ? Number(args[args.indexOf("--cekim") + 1]) : null;
 const joinOnly = args.includes("--birlestir"); // çekimleri yeniden çizmeden yalnızca birleştir
-const base = process.env.SITE ?? "http://localhost:4183/";
+const base = process.env.SITE ?? "http://localhost:4193/";
 const S = file.endsWith(".json") ? JSON.parse(readFileSync(file, "utf8")) : (await import(resolve(file))).default;
 const olcek = S.olcek ?? 1;
 const fps = preview ? 15 : S.fps ?? 30;

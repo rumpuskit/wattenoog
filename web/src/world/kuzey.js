@@ -127,7 +127,7 @@ export function buildKuzey(world) {
         const P = [box(14, 1.0, 9, 0, 0.5, 0, "#d8d2c4")];
         const shell = new THREE.SphereGeometry(7, 20, 10, -Math.PI / 2, Math.PI, 0, Math.PI / 2).scale(1, 1.05, 1.0).translate(0, 1.0, -1.5);
         P.push(colored(shell, "#f7f5ef"));
-        for (let k = 0; k < 5; k++) P.push(colored(new THREE.TorusGeometry(7.02, 0.12, 4, 24, Math.PI).rotateY(Math.PI / 2).rotateX(-Math.PI / 2 + (k * Math.PI) / 9).translate(0, 1.0, -1.5), "#e8e2d4"));
+        P.push(box(14.4, 6.5, 0.4, 0, 4.2, -1.8, "#ece6d8")); // arka duvar (kabuk ona dayanır)
         const m = new THREE.Mesh(merged(P.map((q) => (q.index ? q.toNonIndexed() : q))), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide }));
         m.castShadow = m.receiveShadow = true;
         g.add(m);

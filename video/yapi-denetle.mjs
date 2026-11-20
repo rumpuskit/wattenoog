@@ -2,7 +2,7 @@
 // N bina, her kat; eşya ↔ duvar, kapı kasası, kapı kanadı, merdiven çekirdeği; (3) iş yeri iç mekânları: her türden bir
 // bina, her kat; eşya ↔ dış kabuk ve iç duvar. Bina, iç mekân ya da yerleşim değişikliğinden sonra çalıştır; hepsi 0
 // olmalı. kalite.mjs (alçak açılı kareler) ve iç mekân kareleriyle birlikte.
-//   cd web && npx vite build && npx vite preview --port 4183   (ayrı terminalde)
+//   cd web && npx vite build && npx vite preview --port 4193   (ayrı terminalde)
 //   cd video && node yapi-denetle.mjs [sorgu, varsayılan "gelisim=20000&nufus=20000"] [N, varsayılan 12]
 //   F=<regex> yalnız eşleşen türler (konut: "cottage|apartments", iş yeri: "garaj|ahir"), V=1 daha çok örnek.
 import { chromium } from "playwright-core";
@@ -10,7 +10,7 @@ const q = process.argv[2] ?? "gelisim=20000&nufus=20000", N = Number(process.arg
 const b = await chromium.launch({ channel: "chrome", args: ["--use-angle=metal", "--enable-gpu"] });
 const p = await b.newPage({ viewport: { width: 300, height: 300 } });
 p.on("pageerror", (e) => console.log("PAGEERR", e.message));
-await p.goto(`http://localhost:4183/?denetle&saat=14:00&api=yok&${q}`);
+await p.goto(`http://localhost:4193/?denetle&saat=14:00&api=yok&${q}`);
 await p.waitForFunction(() => globalThis.__ada?.ui, null, { timeout: 180000 });
 const res = await p.evaluate(({ N, F, V }) => {
   const A = globalThis.__ada, W = A.world, D = A.people.dollhouse, P = Object.getPrototypeOf(D);

@@ -1,6 +1,6 @@
 // Kalite taraması: adanın her yerinden alçak açılı kareler (yol türleri, meydanlar, iskeleler, rıhtım boyu,
 // binaların tabanı, rastgele kara noktaları). Arazi/yol/kıyı değişikliğinden sonra çalıştır, kareleri gözle incele.
-//   cd web && npx vite build && npx vite preview --port 4183   (ayrı terminalde)
+//   cd web && npx vite build && npx vite preview --port 4193   (ayrı terminalde)
 //   cd video && node kalite.mjs <çıktı klasörü> [sorgu, varsayılan "gelisim=3000&nufus=3000"]
 //   F="rihtim|iskele" yalnız o türler; N=20 ilk 20 nokta. Her nokta iki açıdan: <sıra>-0.png, <sıra>-1.png.
 // "CONTEXT LOST" satırı WebGL bağlamının düştüğünü gösterir (ağır sahnede telefonda da olabilir: incele).
@@ -8,7 +8,7 @@ import { chromium } from "playwright-core";
 const out = process.argv[2], q = process.argv[3] ?? "gelisim=3000&nufus=3000";
 const b = await chromium.launch({ channel: "chrome", args: ["--use-angle=metal", "--enable-gpu"] });
 const p = await b.newPage({ viewport: { width: 420, height: 420 } });
-await p.goto(`http://localhost:4183/?denetle&saat=12:30&api=yok&${q}`);
+await p.goto(`http://localhost:4193/?denetle&saat=12:30&api=yok&${q}`);
 await p.waitForFunction(() => globalThis.__ada?.ui, null, { timeout: 180000 });
 await p.evaluate(() => { const c = document.querySelector("canvas"); c.addEventListener("webglcontextlost", () => console.log("CONTEXT LOST")); c.addEventListener("webglcontextrestored", () => console.log("CONTEXT RESTORED")); });
 p.on("console", (m) => /CONTEXT|rror/.test(m.text()) && console.log("KONSOL", m.text().slice(0, 200)));

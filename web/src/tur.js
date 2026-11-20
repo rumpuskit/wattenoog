@@ -20,7 +20,7 @@ export function createTour({ world, people, residents, flyTo, cinema, vec }) {
       const cx = homes.reduce((a, b) => a + b.x, 0) / homes.length, cz = homes.reduce((a, b) => a + b.z, 0) / homes.length;
       const mahalleler = new Set(sim.cat().mahalleler);
       const lab = world.labels.find((l) => mahalleler.has(l.text));
-      out.push({ at: [cx, cz], d: 120, t: lab?.text ?? "Wohnviertel", s: "Hier hat jeder Follower ein Zuhause. Gib deinen @Namen in die Suche ein, dann findest du deins." });
+      out.push({ at: [cx, cz], d: 120, t: lab?.text ?? "Wohnviertel", s: "Hier wohnen unsere Follower, die eingezogen sind. Gib deinen @Namen in die Suche ein, dann findest du dein Zuhause." });
     }
     const pier = world.ferryPier;
     if (pier) out.push({ at: [(pier.x0 + pier.x1) / 2, pier.z0 + 30], d: 80, t: "Fähranleger", s: `Die Fähre kommt alle ${FERRY.period} Minuten. Hier kommen die Neuen an, und hier fahren alle ab, die auf dem Festland arbeiten.` });

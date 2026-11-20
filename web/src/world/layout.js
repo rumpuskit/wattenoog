@@ -838,9 +838,10 @@ export class World {
       const b = this.addBuilding({ kind: "belediye", x: 62 + 1 + st.d / 2, z: 0, rot: -Math.PI / 2, w: st.w, d: st.d, floors: st.floors, roofType: st.roof, wall: st.wall, roof: st.roofColor, style: st, workplace: true, address: "Am Markt 1" });
       const door = [62 + 0.65, 0];
       this._addWorkplace("belediye", 0, { door, path: [door, HUB], anchor: door, spread: 2, building: b });
-      this.features.push({ type: "gonder", x: 56, z: -17, ada: true });
       this.features.push({ type: "gonder", x: 56, z: 17, de: true });
     });
+    // Ada bayrağı direği baştan var (20 Kasım: videolar bayrakla açılır; Rathaus 100. sakinde gelir, Almanya bayrağı onunla).
+    this.features.push({ type: "gonder", x: 56, z: -17, ada: true });
 
     this._fronts();
     this._tag("carsi_yol", () => {

@@ -30,7 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import istekler  # noqa: E402
 import secim  # noqa: E402
-from import_followers import AktarimHatasi, _tikninja_json, aktar, taban_al  # noqa: E402
+from import_followers import TABAN_ZORUNLU, AktarimHatasi, _tikninja_json, aktar, taban_al  # noqa: E402
+import ortak  # noqa: E402
 from ortak import DB, ROOT, psql, publish  # noqa: E402
 
 MAX_BYTES = 64 << 20  # ~1M takipçilik liste
@@ -143,6 +144,9 @@ def main() -> int:
             elif msg.get("tur") == "yorumlar" and isinstance(msg.get("yorumlar"), list):
                 hesap = msg.get("hesap")
                 out = yorumlar(str(hesap).lower() if hesap else None, msg["yorumlar"])
+            elif msg.get("tur") in ("sayi", "liste") and TABAN_ZORUNLU and not ortak.taban_ozetleri(DB):
+                # Eski hesap: taban yokken sayı iskelede 1.059 bekleyen, liste herkesi adaya taşırdı.
+                raise AktarimHatasi("taban (eski takipçiler) alınmadı: önce `tasinma.py taban < liste.json`")
             elif msg.get("tur") == "sayi":
                 out = sayi(takipci)
             elif msg.get("tur") == "liste" and isinstance(msg.get("liste"), list):

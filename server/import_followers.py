@@ -25,6 +25,7 @@ Kurallar:
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import time
@@ -39,6 +40,10 @@ from ortak import DB, ISTEK_GUN, RETURN_WINDOW_DAYS, key_of, opt_out_hash, psql,
 HANDLE_RE = re.compile(r"^[a-z0-9._]{1,30}$")
 MIN_RATIO = 0.8
 NAME_KEYS = ("username", "user_name", "uniqueid", "unique_id")
+
+
+# Taban alınmadan taşınma yok (eski hesap). Testler eski davranışı sınamak için WATTENOOG_TABAN_ZORUNLU=0 verir.
+TABAN_ZORUNLU = os.environ.get("WATTENOOG_TABAN_ZORUNLU", "1") != "0"
 
 
 class AktarimHatasi(Exception):
@@ -223,6 +228,10 @@ def taban_suz(followers: dict[str, tuple[int, int]], day: int, platform: str = "
     olduğu gibi döner."""
     taban = ortak.taban_ozetleri(db)
     if not taban:
+        # Wattenoog eski bir hesap (1.059 takipçi): taban alınmadan gelen liste herkesi adaya taşırdı. Taban alınana dek
+        # liste reddedilir (tiktok-viewer-de de taban_alindi = false iken göndermez; bu ikinci kilit).
+        if TABAN_ZORUNLU and followers:
+            raise AktarimHatasi("taban (eski takipçiler) alınmadı: önce `tasinma.py taban < liste.json`")
         return followers, 0, []
     tuz = ortak.taban_tuz()
     gecerli = f"left_day IS NULL OR {int(day)} - left_day <= {RETURN_WINDOW_DAYS}"

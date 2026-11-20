@@ -33,7 +33,7 @@ class TasinmaTest(unittest.TestCase):
         sh("createdb", DB)
         sh("psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", DB, "-f", str(SERVER / "schema.sql"))
         self.root = tempfile.mkdtemp()
-        self.env = dict(os.environ, WATTENOOG_DB=DB, WATTENOOG_ROOT=self.root)
+        self.env = dict(os.environ, WATTENOOG_DB=DB, WATTENOOG_ROOT=self.root, WATTENOOG_TABAN_ZORUNLU="0")
 
     def send(self, msg) -> tuple[int, dict]:
         p = subprocess.run([sys.executable, str(SERVER / "tasinma.py")], input=json.dumps(msg),
@@ -56,6 +56,17 @@ class TasinmaTest(unittest.TestCase):
         code, out = self.send({"tur": "liste", "takipci": 1, "liste": []})
         self.assertEqual(code, 0, out)
         self.assertEqual(self.published()["bekleyen"], 0)
+
+    def test_taban_zorunlu(self):
+        # Gerçek ayar (eski hesap): taban alınmadan sayı ve liste reddedilir, kimse taşınmaz, sayaç değişmez.
+        self.env["WATTENOOG_TABAN_ZORUNLU"] = "1"
+        for msg in ({"tur": "sayi", "takipci": 1059}, {"tur": "liste", "takipci": 2, "liste": [["eski1", 100, 0], ["eski2", 101, 0]]}):
+            code, out = self.send(msg)
+            self.assertEqual(code, 1, out)
+            self.assertIn("taban", out["hata"])
+        self.assertEqual(self.q("SELECT count(*) FROM sakinler"), "0")
+        code, out = self.send({"tur": "yorumlar", "yorumlar": []})
+        self.assertEqual(code, 0, out)
 
     def test_tasinma_akisi(self):
         # Saatlik sayı: henüz kimse taşınmadı, hepsi iskelede bekliyor.

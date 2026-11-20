@@ -1,76 +1,75 @@
-// Bayraklar ve tatil süsleri (ABD). Town Green'deki ve Town Hall önündeki direklerde ABD bayrağı her gün dalgalanır;
-// evlerin bir kısmının verandasında yıl boyu küçük bayrak asılıdır.
-// Bayrak günlerinde (Presidents' Day, Memorial Day, 4 Temmuz, Labor Day, Veterans Day; sim.holidayOf) sokak
-// lambalarında ve kamu binalarının önünde bayraklar, verandalarda daha çok bayrak. 4 Temmuz akşamı ve yılbaşı gece
-// yarısı koyun üstünde havai fişek. Halloween haftası (24–31 Ekim) verandalarda balkabakları (gece içleri yanar),
-// Aralık boyunca (6 Ocak'a kadar) saçaklarda renkli ışıklar ve Green'de Noel ağacı.
+// Bayraklar ve tatil süsleri (Almanya, Kuzey Denizi adası). Marktplatz'taki ve Rathaus önündeki direklerde her gün ada
+// bayrağı ve Almanya bayrağı dalgalanır; bazı evlerin bahçesinde yıl boyu ada bayraklı bahçe direği vardır (Kuzey
+// Almanya'da yaygın). Resmî bayrak günlerinde (1 Mayıs, 9 Mayıs, 23 Mayıs, 3 Ekim) kamu binalarının önünde Almanya
+// bayrağı. Silvester gece yarısı limanın açığında havai fişek. Advent'ten (Noel'den önceki 4. pazar) 6 Ocak'a dek
+// pencerelerde sıcak beyaz ışık yayları ve saçak ışıkları, Marktplatz'ta Weihnachtsbaum.
 import * as THREE from "three";
-import { civilFromDays, holidayOf } from "../sim.js";
+import { civilFromDays, daysFromCivil, holidayOf, weekday } from "../sim.js";
 import { FLAT_Y, FLOOR_H } from "./layout.js";
 import { sunTimes } from "./sky.js";
-
-const FLAG_DAYS = new Set(["presidents", "memorial", "independence", "labor", "veterans"]);
 
 function monthDay(day) {
   const [, m, d] = civilFromDays(day);
   return [m, d];
 }
 
-/** Bayrak günü mü? 4 Temmuz'da bir gün önce ve sonra da (uzun hafta sonu). */
+/** Resmî bayrak günü mü (kamu binalarında Almanya bayrağı)? */
 export function bayramOf(day) {
-  if (FLAG_DAYS.has(holidayOf(day))) return true;
+  if (holidayOf(day) === "maifeiertag" || holidayOf(day) === "einheit") return true;
   const [m, d] = monthDay(day);
-  return m === 7 && d >= 3 && d <= 5;
+  return m === 5 && (d === 9 || d === 23);
 }
 
-function halloweenOf(day) {
-  const [m, d] = monthDay(day);
-  return m === 10 && d >= 24;
+function halloweenOf() {
+  return false; // Wattenoog'da Halloween süsü yok (31 Ekim Reformationstag)
 }
 
+/** Advent: Noel'den önceki 4. pazardan 6 Ocak'a dek. */
 function christmasOf(day) {
-  const [m, d] = monthDay(day);
-  return m === 12 || (m === 1 && d <= 6);
+  const [y, m, d] = civilFromDays(day);
+  if (m === 1) return d <= 6;
+  const xmas = daysFromCivil(y, 12, 25);
+  const firstAdvent = xmas - ((weekday(xmas) + 1) % 7 || 7) - 21; // Noel'den önceki pazar − 3 hafta
+  return day >= firstAdvent && m >= 11;
 }
 
-/** Havai fişek zamanı: 4 Temmuz 21:00–21:35 ve yılbaşı 00:00–00:20. */
+/** Havai fişek zamanı: Silvester gece yarısı (1 Ocak 00:00–00:25). */
 function fireworksOn(day, minute) {
   const [m, d] = monthDay(day);
-  if (m === 7 && d === 4) return minute >= 21 * 60 && minute < 21 * 60 + 35;
-  if (m === 1 && d === 1) return minute < 20;
-  return false;
+  return m === 1 && d === 1 && minute < 25;
 }
 
-/** ABD bayrağı dokusu: 13 kırmızı-beyaz çizgi, lacivert kantonda 50 yıldız (9 sıra, 6 ve 5). Oran 19:10. */
-function flagTexture() {
+function canvasFlag(w, h, draw) {
   const c = document.createElement("canvas");
-  c.width = 494; c.height = 260;
-  const g = c.getContext("2d");
-  const sh = c.height / 13;
-  for (let i = 0; i < 13; i++) {
-    g.fillStyle = i % 2 ? "#ffffff" : "#b22234";
-    g.fillRect(0, i * sh, c.width, sh + 0.5);
-  }
-  const cw = c.width * 0.4, ch = sh * 7;
-  g.fillStyle = "#3c3b6e";
-  g.fillRect(0, 0, cw, ch);
-  g.fillStyle = "#ffffff";
-  for (let r = 0; r < 9; r++) {
-    const n = r % 2 ? 5 : 6;
-    for (let k = 0; k < n; k++) {
-      const x = (cw / 12) * (r % 2 ? 2 + k * 2 : 1 + k * 2), y = (ch / 10) * (r + 1);
-      g.beginPath();
-      for (let p = 0; p < 10; p++) {
-        const a = -Math.PI / 2 + (p * Math.PI) / 5, rr = p % 2 ? 2.2 : 5.4;
-        p ? g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-      }
-      g.closePath(); g.fill();
-    }
-  }
+  c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
+}
+
+/** Almanya bayrağı: siyah-kırmızı-altın yatay şeritler (5:3; düzlem 19:10 olduğu için hafif uzar, fark edilmez). */
+function deFlagTexture() {
+  return canvasFlag(500, 300, (g, w, h) => {
+    [["#000000", 0], ["#dd0000", 1], ["#ffce00", 2]].forEach(([c, i]) => { g.fillStyle = c; g.fillRect(0, (i * h) / 3, w, h / 3 + 1); });
+  });
+}
+
+/** Wattenoog ada bayrağı: mavi zemin, ortada beyaz dalga şeridi, üst köşede uçan beyaz martı (siyasi çağrışım yok). */
+function flagTexture() {
+  return canvasFlag(494, 260, (g, w, h) => {
+    g.fillStyle = "#1f5fa8"; g.fillRect(0, 0, w, h);
+    g.fillStyle = "#e8c33a"; g.fillRect(0, h * 0.78, w, h * 0.22); // altta kum sarısı şerit
+    g.strokeStyle = "#ffffff"; g.lineWidth = h * 0.09; g.beginPath();
+    for (let x = 0; x <= w; x += 4) { const y = h * 0.62 + Math.sin((x / w) * Math.PI * 4) * h * 0.05; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+    // Martı: iki kavisli kanat.
+    g.lineWidth = h * 0.05; g.lineCap = "round"; g.beginPath();
+    const cx = w * 0.3, cy = h * 0.3, s = h * 0.16;
+    g.moveTo(cx - s * 1.6, cy); g.quadraticCurveTo(cx - s * 0.7, cy - s * 0.9, cx, cy + s * 0.2); g.quadraticCurveTo(cx + s * 0.7, cy - s * 0.9, cx + s * 1.6, cy);
+    g.stroke();
+  });
 }
 
 /** Dalgalanan bayrak malzemesi: gönder tarafı (uv.x = 0) sabit, uç tarafı rüzgârda dalgalanır. */
@@ -94,22 +93,18 @@ function waveMaterial(map, amp, uniforms) {
 
 const hsh = (b, salt) => (Math.imul((Math.round(b.x * 7) ^ Math.round(b.z * 13) ^ (salt * 7919)) | 0, 2654435761) >>> 0) / 4294967296;
 
-/** Evin verandası (yerel): balkabağı yerleri, bayrak direği ucu, saçak çizgisi. */
+/** Evin önü (yerel): bahçe bayrak direğinin yeri (ön bahçenin köşesi). Apartmanlarda yok. */
 function porchOf(b) {
   const front = b.d / 2;
-  switch (b.house) {
-    case "friesenhaus": return { pumpkins: [[-0.95, front + 1.0], [1.0, front + 1.1]], deck: 0.45, flag: [1.0, front + 1.25, 2.3] };
-    case "doppelhaus": return { pumpkins: [[-b.w / 2 + 0.7, front + 1.6], [-b.w / 2 + 1.3, front + 1.9], [b.w / 2 - 0.8, front + 1.6]], deck: 0.5, flag: [b.w / 2 - 0.2, front + 2.25, 2.6] };
-    case "kapitaenshaus": return { pumpkins: [[-1.6, front + 1.5], [1.6, front + 1.5], [-b.w / 2 + 0.8, front + 2.0]], deck: 0.5, flag: [b.w / 2 - 0.2, front + 2.45, 2.6] };
-    default: return { pumpkins: [[-1.9, front + 1.2], [1.9, front + 1.2]], deck: 0.1, flag: null };
-  }
+  if (b.house === "mehrfamilienhaus") return { pumpkins: [], deck: 0.1, flag: null };
+  return { pumpkins: [], deck: 0.1, flag: [b.w / 2 + 0.8, front + (b.yard ?? 4) - 0.8, 0] };
 }
 
 export function buildBayram(world) {
   const group = new THREE.Group(); // bayrak günleri
   group.visible = false;
   const uniforms = { uTime: { value: 0 } };
-  const tex = flagTexture();
+  const tex = flagTexture(), deTex = deFlagTexture();
   // Bayrak düzlemi: sol kenar (gönder tarafı) x = 0'da, üst kenar y = 0'da; 1 × 10/19 m, ölçeklenir.
   const flagGeo = new THREE.PlaneGeometry(1, 10 / 19, 10, 2).translate(0.5, -5 / 19, 0);
   const poleMat = new THREE.MeshStandardMaterial({ color: "#e4e6e9", roughness: 0.4, metalness: 0.6 });
@@ -137,18 +132,10 @@ export function buildBayram(world) {
     return m;
   };
 
-  // --- bayrak günleri ---
+  // --- bayrak günleri: kamu binalarının önünde direk ve Almanya bayrağı ---
   const wave = [], poles = [];
-  // 1) Sokak lambaları: direğe bağlı, yola paralel dalgalanan bayrak.
-  for (const l of world.lampSpots ?? []) {
-    if (l.hidden) continue;
-    const top = l.deco ? 3.5 : 5.0;
-    const along = l.dir + Math.PI / 2;
-    wave.push(mat4(l.x + Math.sin(along) * 0.12, l.y + top, l.z + Math.cos(along) * 0.12, along - Math.PI / 2, l.deco ? 1.35 : 1.6));
-  }
-  // 2) Kamu binalarının önünde direk.
   for (const b of world.buildings) {
-    if (!["okul", "saglik", "karakol", "adliye", "liman", "kutuphane", "muze"].includes(b.kind)) continue;
+    if (!["okul", "saglik", "karakol", "adliye", "kutuphane", "muze", "belediye"].includes(b.kind)) continue;
     const ahead = b.d / 2 + 4, side = b.w * 0.36;
     const x = b.x + Math.sin(b.rot) * ahead + Math.cos(b.rot) * side, z = b.z + Math.cos(b.rot) * ahead - Math.sin(b.rot) * side;
     if (!world.isLand(x, z)) continue;
@@ -156,34 +143,37 @@ export function buildBayram(world) {
     poles.push({ x, y, z, h: 8, r: 0.06 });
     wave.push(mat4(x, y + 8 - 0.15, z, b.rot - Math.PI / 2, 1.9));
   }
-  // 3) Verandalarda eğik direkli bayrak: bayrak günlerinde evlerin %40'ı (yıl boyu asılı olanlar hariç).
+  // Bahçe direkleri (yıl boyu, evlerin ~%12'sinde): 6 m direk, ada bayrağı.
   const porchFlags = { always: [], holiday: [] };
+  const gardenPoles = [];
   for (const b of world.buildings) {
     if (!b.house) continue;
     const pr = porchOf(b);
-    if (!pr.flag) continue;
-    const r = hsh(b, 1);
-    if (r > 0.4) continue;
+    if (!pr.flag || hsh(b, 1) > 0.12) continue;
     const [x, z] = toWorld(b, pr.flag[0], pr.flag[1]);
-    (r < 0.12 ? porchFlags.always : porchFlags.holiday).push(mat4(x, FLAT_Y + pr.flag[2], z, b.rot + Math.PI / 2, 1.0, -0.6));
+    if (!world.isLand(x, z)) continue;
+    const y = world.groundY(x, z);
+    gardenPoles.push({ x, y, z, h: 6, r: 0.05 });
+    porchFlags.always.push(mat4(x, y + 6 - 0.1, z, b.rot - Math.PI / 2, 1.3));
   }
-  group.add(inst(flagGeo, waveMaterial(tex, 0.1, uniforms), wave));
-  group.add(inst(flagGeo, waveMaterial(tex, 0.03, uniforms), porchFlags.holiday, false));
+  group.add(inst(flagGeo, waveMaterial(deTex, 0.1, uniforms), wave));
   group.add(inst(poleGeo, poleMat, poles.map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y, o.z), q.identity(), sc.set(o.r * 2, o.h, o.r * 2)))));
   group.add(inst(knobGeo, gold, poles.map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y + o.h + o.r * 1.6, o.z), q.identity(), sc.setScalar(o.r * 1.9)))));
 
   const fireworks = buildFireworks(world);
 
-  // --- her gün: Green ve Town Hall direkleri, yıl boyu veranda bayrakları ---
+  // --- her gün: Rathaus önündeki direkler (ada ve Almanya bayrağı), bahçe direkleri ---
   const mast = new THREE.Group();
   const mastU = { uTime: { value: 0 } };
-  const masts = world.features.filter((f) => f.type === "gonder").map((f) => ({ x: f.x, y: world.groundY(f.x, f.z), z: f.z, h: f.abd ? 14 : 12, r: 0.1 }));
+  const masts = world.features.filter((f) => f.type === "gonder").map((f) => ({ x: f.x, y: world.groundY(f.x, f.z), z: f.z, h: 12, r: 0.1, de: !!f.de }));
   if (masts.length) {
-    mast.add(inst(flagGeo, waveMaterial(tex, 0.13, mastU), masts.map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y + o.h - 0.15, o.z), q.identity(), sc.setScalar(3.2)))));
-    mast.add(inst(poleGeo, poleMat, masts.map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y, o.z), q.identity(), sc.set(o.r * 2, o.h, o.r * 2)))));
-    mast.add(inst(knobGeo, gold, masts.map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y + o.h + o.r * 1.6, o.z), q.identity(), sc.setScalar(o.r * 1.9)))));
+    for (const [list, t] of [[masts.filter((o) => !o.de), tex], [masts.filter((o) => o.de), deTex]]) {
+      if (list.length) mast.add(inst(flagGeo, waveMaterial(t, 0.13, mastU), list.map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y + o.h - 0.15, o.z), q.identity(), sc.setScalar(3.2)))));
+    }
+    mast.add(inst(poleGeo, poleMat, masts.concat(gardenPoles).map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y, o.z), q.identity(), sc.set(o.r * 2, o.h, o.r * 2)))));
+    mast.add(inst(knobGeo, gold, masts.concat(gardenPoles).map((o) => new THREE.Matrix4().compose(p.set(o.x, o.y + o.h + o.r * 1.6, o.z), q.identity(), sc.setScalar(o.r * 1.9)))));
   }
-  mast.add(inst(flagGeo, waveMaterial(tex, 0.03, mastU), porchFlags.always, false));
+  mast.add(inst(flagGeo, waveMaterial(tex, 0.05, mastU), porchFlags.always, false));
   mast.add(fireworks.points);
 
   // --- Halloween: verandalarda balkabakları (gece içleri yanar) ---
@@ -211,7 +201,7 @@ export function buildBayram(world) {
   // Ampuller: örnek rengiyle çarpılan tonsuz malzeme (gece parlak, gündüz soluk).
   const bulbMat = new THREE.MeshBasicMaterial({ color: "#8c8c8c", toneMapped: false });
   const bulbs = [], bulbColors = [];
-  const COLORS = ["#ff3b3b", "#3bd16f", "#3b8bff", "#ffc23b", "#fff2d6"];
+  const COLORS = ["#fff2d6", "#ffe9c2", "#fff6e6"]; // Kuzey Almanya: sıcak beyaz
   for (const b of world.buildings) {
     if (!b.house || hsh(b, 5) > 0.65) continue;
     const y = FLAT_Y + b.floors * FLOOR_H + 0.05;
@@ -225,9 +215,9 @@ export function buildBayram(world) {
   const bulbMesh = inst(new THREE.SphereGeometry(0.07, 5, 4), bulbMat, bulbs, false);
   bulbColors.forEach((c, i) => bulbMesh.setColorAt(i, new THREE.Color(c)));
   christmas.add(bulbMesh);
-  // Noel ağacı (Green'in güneybatısında): üç katlı koni, ışıklar ve tepede yıldız.
+  // Weihnachtsbaum (Marktplatz'ın kuzeydoğu köşesi): üç katlı koni, sıcak beyaz ışıklar, tepede yıldız.
   {
-    const tx = -38, tz = 22, y = world.groundY(tx, tz);
+    const tx = 30, tz = -22, y = world.groundY(tx, tz);
     const tree = new THREE.MeshStandardMaterial({ color: "#2f5a34", roughness: 0.9, flatShading: true });
     for (const [r, h, yy] of [[3.4, 4.2, 1.6], [2.7, 3.6, 4.0], [1.9, 3.0, 6.2]]) {
       const c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 10), tree);

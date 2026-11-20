@@ -120,7 +120,7 @@ export function land(x, z) {
 export const RESERVES = {
   town: { x0: -430, x1: 470, z0: -560, z1: 660 }, // Marktplatz, Strandstraße'nin dükkânlı kısmı, Hafenweg, kilise, Rathaus
   kur: { x0: -170, x1: 170, z0: -1560, z1: -560 }, // Strandstraße'nin Kurviertel kısmı (villalar), Kurhaus
-  hafen: { x0: -760, x1: 980, z0: 580, z1: 1000 }, // liman, Bootswerft (batı), Versorgungshafen (doğu)
+  hafen: { x0: -340, x1: 600, z0: 540, z1: 1000 }, // liman havuzu, Bootswerft, Seenotretter, Seehundstation
   polder: { x0: 1950, x1: 3000, z0: -260, z1: 900 }, // set arkası tarlalar, çiftlik, yel değirmeni
   wasserturm: { x: -560, z: -1060, r: 100 }, // kumul üstünde su kulesi ve seyir yeri
   westkopf: { x: -3280, z: -560, r: 470 }, // batı başı: yüksek kumul, deniz feneri, fener bekçisinin evi
@@ -326,7 +326,7 @@ export function computeZones(count, typeOf) {
 
 // --- arazi yüksekliği ---
 
-const WESTKOPF = { x: -3250, z: -560, r: 320, h: 19 };
+const WESTKOPF = { x: -3250, z: -560, r: 260, h: 11 };
 export const WASSERTURM = { x: -560, z: -1060, r: 55, h: 10 };
 
 /** Doğal yükseklik (FLAT_Y üstü): kumul kuşağı ve dağınık kumul tepecikleri, Westkopf, su kulesi kumulu. Köy düz. */
@@ -486,6 +486,7 @@ export function terrainHeight(x, z) {
     const t = 1 - L / 30;
     return h * (1 - smooth(t)) + 0.1 * t;
   }
+  if (L >= 0) return h;
   if (L < 0 && !southSide) return Math.max(-14, Math.min(-0.6 + L * 0.05, seabed(x, z, L)));
   return Math.max(seabed(x, z, L), southSide ? -12 : -14);
 }

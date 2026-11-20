@@ -1,6 +1,7 @@
 // Ağaçlar (New England: akçaağaç, meşe, sahil çamı, ardıç) ve bulutlar. Boylar gerçektir. Akçaağaç ve meşenin
 // rengi mevsime göre (world.month): Ekim–Kasım sonbahar renkleri, kışın soluk.
 import * as THREE from "three";
+import * as I from "./island.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { fbm, hash2, rng } from "./noise.js";
 
@@ -59,10 +60,16 @@ function cypress(H) {
 
 // Her ağaç türü kendi referans boyunda tek parça kurulur (gövde + dallar + taç); örnekler yalnızca
 // döndürülüp orantılı ölçeklenir. Böylece taç hep gövdeye oturur.
-const REF = { camk: 9, servi: 8, akcaagac: 10, mese: 11 };
+const REF = { camk: 9, servi: 8, akcaagac: 10, mese: 11, linde: 10 };
 
 /** Mevsim renkleri (ay 0-11). Akçaağaç: yazın yeşil, Ekim–Kasım kırmızı-turuncu-sarı, kışın soluk kahve. */
 function seasonColors(kind, month) {
+  if (kind === "linde") {
+    // Ihlamur (Linde): yazın açık yeşil, Ekim–Kasım altın sarısı, kışın soluk.
+    if (month >= 9 && month <= 10) return ["#c9a93a", "#d8b84a", "#b8963a", "#a9a04a", "#8f9a45"];
+    if (month === 11 || month <= 2) return ["#8d806a", "#958870", "#80745e"];
+    return ["#78a650", "#6e9d4a", "#84b058"];
+  }
   if (kind === "akcaagac") {
     if (month >= 9 && month <= 10) return ["#c8452c", "#e07a2a", "#e9b23a", "#b8352f", "#d9662f", "#f0c24a"];
     if (month === 8) return ["#7aa755", "#a8b04a", "#6f9d4c", "#c9a23a"];
@@ -109,6 +116,16 @@ const KINDS = {
     ]); },
     crown: (v) => colored(clumps("akcaagac" + v, 8 + v, 1.7 + v * 0.2, 2.3, [0.95, 0.88, 1.0][v], 7.0).translate([0.1, 0.35, -0.25][v], 0, 0), "#ffffff"),
   },
+  linde: {
+    // Ihlamur: düz gövde, yüksek ve yuvarlak oval taç (köy meydanı, sokaklar, Kurviertel).
+    h: [9, 14], trunkR: 0.34, colors: ["#78a650"],
+    trunk: (v) => { const t = [0.05, 0.25, -0.2][v]; return mergeColored([
+      branch([0, 0, 0], [t, 5.8, 0], 0.36, 0.24, "#5f574f"),
+      branch([t, 4.6, 0], [t + 1.2, 6.8, 0.4], 0.14, 0.07, "#5f574f"),
+      branch([t, 4.9, 0], [t - 1.1, 7.0, -0.6], 0.14, 0.07, "#5f574f"),
+    ]); },
+    crown: (v) => colored(clumps("linde" + v, 9 + v, 1.6 + v * 0.15, 2.0, [0.85, 0.8, 0.9][v], 8.2).scale(0.9, 1.15, 0.9).translate([0.05, 0.25, -0.2][v], 0, 0), "#ffffff"),
+  },
   mese: {
     // Ak meşe: kalın gövde, geniş ve basık, düzensiz taç.
     h: [9, 14], trunkR: 0.45, colors: ["#567f3c"],
@@ -122,12 +139,13 @@ const KINDS = {
   },
 };
 
+// Kuzey Denizi adası: ağaç seyrek ve rüzgârdan alçak. Kumul ve gri kumulda yalnız tek tük çam (Dünenkiefer), köyde ve
+// mahallelerde ıhlamur, meşe, akçaağaç; kırda küçük korular (meşe, çam) ve açık otlak; set, tuzlu bataklık, polder ağaçsız.
 function treeKind(world, x, z, h, roll, zone) {
-  if (world.sdf(x, z) > -45 || zone === "kumul") return roll < 0.75 ? "camk" : "servi";
-  if (zone === "tepe") return roll < 0.55 ? "servi" : "camk";
-  if (zone === "mahalle") return roll < 0.5 ? "akcaagac" : roll < 0.85 ? "mese" : "camk";
-  if (zone === "merkez") return roll < 0.7 ? "akcaagac" : "mese";
-  return roll < 0.42 ? "mese" : roll < 0.75 ? "camk" : "akcaagac";
+  if (world.sdf(x, z) > -45 || zone === "kumul" || zone === "tepe") return "camk";
+  if (zone === "mahalle") return roll < 0.45 ? "linde" : roll < 0.75 ? "mese" : roll < 0.9 ? "akcaagac" : "camk";
+  if (zone === "merkez") return roll < 0.75 ? "linde" : "mese";
+  return roll < 0.55 ? "mese" : roll < 0.85 ? "camk" : "linde";
 }
 
 function treeDensity(world, x, z, h, zone) {
@@ -136,14 +154,14 @@ function treeDensity(world, x, z, h, zone) {
     // Parklar yalnız yerleşik alanda: büyük park (göl) ve mahalle parkları.
     if ((world._bigParks ??= world.plazas.filter((p) => p.kind === "park")).some((p) => x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1)) return 0.5;
     if (world.parks.some((p) => x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1)) return 0.35;
-    return zone === "mahalle" ? 0.22 : 0.08;
+    return zone === "mahalle" ? 0.12 : 0.04;
   }
   if ((world._bigParks ??= world.plazas.filter((p) => p.kind === "park")).some((p) => x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1)) return 0.5;
-  if (zone === "tepe") return 0.03 + Math.max(0, fbm(x / 70, z / 70, 32)) * 0.25; // fundalık: seyrek ardıç
-  if (zone === "kumul") return 0.015;
-  if (zone === "tarla") return 0.03;
-  // Kır: korular ve açıklıklar.
-  return 0.015 + Math.max(0, fbm(x / 140, z / 140, 31)) * 0.65;
+  if (zone === "tepe") return 0.004;
+  if (zone === "kumul") return world.isDune?.(x, z) && z - I.northShoreZ(x) > 220 ? 0.006 : 0; // yalnız iç gri kumulda
+  if (zone === "tarla" || zone === "deich") return 0;
+  // Kır: açık otlak; arada küçük korular (rüzgâr kırıcı).
+  return Math.max(0, fbm(x / 160, z / 160, 31) - 0.18) * 0.22;
 }
 
 /** (x, z) açılmamış bir binanın parselinde mi: bina tabanı + şantiye çiti (1,5 m) + taç payı (3 m). */

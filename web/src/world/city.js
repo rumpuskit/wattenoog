@@ -112,14 +112,18 @@ export function makeKit() {
   const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
   return {
     B: {
-      // walls: ahşap kaplama (clapboard); brick: tuğla cepheler (Main Street, kamu binaları)
-      walls: new Batch(box, worldTextured(std(0xffffff, { roughness: 0.92 }), T.clapboard(), 2.4)),
+      // walls: sıva (Putz); brick: klinker cepheler (çoğu ev, kilise, Rathaus, dükkânlar)
+      walls: new Batch(box, worldTextured(std(0xffffff, { roughness: 0.95 }), T.plaster(), 3.2)),
       brick: new Batch(box, worldTextured(std(0xffffff, { roughness: 0.95 }), T.brick(), 1.7)),
       sheet: new Batch(box, worldTextured(std(0xffffff, { roughness: 0.6, metalness: 0.25 }), T.sheet(), 1.6)),
       plinth: new Batch(box, worldTextured(std("#b4ada3"), T.stoneBase(), 2.4)),
       trims: new Batch(box, std(0xffffff, { roughness: 0.7 }), { shadow: false }),
-      hips: HIP_RATIOS.map((r) => new Batch(hipRoof(r), worldTextured(std(0xffffff, { roughness: 0.85, flatShading: true }), T.shingles(), 1.4))),
-      gable: new Batch(gableRoof(), worldTextured(std(0xffffff, { roughness: 0.85, flatShading: true }), T.shingles(), 1.4)),
+      // Çatı kiremidi (Dachpfanne; renk örnekten: kırmızı, koyu sırlı, antrasit).
+      hips: HIP_RATIOS.map((r) => new Batch(hipRoof(r), worldTextured(std(0xffffff, { roughness: 0.8, flatShading: true }), T.tiles(), 1.6))),
+      gable: new Batch(gableRoof(), worldTextured(std(0xffffff, { roughness: 0.8, flatShading: true }), T.tiles(), 1.6)),
+      // Saz çatı (Reetdach): kalın, mat, saz lifli.
+      reet: HIP_RATIOS.map((r) => new Batch(hipRoof(r), worldTextured(std(0xffffff, { roughness: 1, flatShading: true }), T.thatch(), 1.3))),
+      reetGable: new Batch(gableRoof(), worldTextured(std(0xffffff, { roughness: 1, flatShading: true }), T.thatch(), 1.3)),
       spires: new Batch(new THREE.ConeGeometry(1, 1, 8).translate(0, 0.5, 0), std(0xffffff, { roughness: 0.6, flatShading: true })),
       parapet: new Batch(box, std("#e7e2d9")),
       frames: new Batch(box, std("#f7f5f0", { roughness: 0.6 }), { shadow: false }),
@@ -232,6 +236,8 @@ export function drawBuilding(K, b, maxFloors = Infinity) {
     B.walls.add(local(b, 0, h, 0), b.rot, s.set(b.w * 0.82, 1.4, b.d * 0.82), b.wall);
     B.domes.add(local(b, 0, h + 1.4, 0), b.rot, s.set(b.w * 0.4, b.w * 0.36, b.d * 0.4), b.roof);
     B.rails.add(local(b, 0, h + 1.4 + b.w * 0.36, 0), b.rot, s.set(0.15, 1.6, 0.15));
+  } else if (full && st.church) {
+    // Kilisenin çatısı ve kulesi drawChurch'te.
   } else if (!full) {
     // Kesit görünümü: çatı yok, üst kat döşemesi.
     B.walls.add(local(b, 0, h, 0), b.rot, s.set(b.w + 0.1, 0.12, b.d + 0.1), "#d6d0c6");
@@ -240,10 +246,17 @@ export function drawBuilding(K, b, maxFloors = Infinity) {
     const k = HIP_RATIOS.reduce((best, x, i) => (Math.abs(x - r) < Math.abs(HIP_RATIOS[best] - r) ? i : best), 0);
     B.hips[k].add(local(b, 0, h, 0), b.rot, s.set(b.w + 1, b.d * 0.3, b.d + 1), b.roof);
     if (b.kind === "konut") B.chimneys.add(local(b, b.w * 0.25, h + b.d * 0.12, -b.d * 0.15), b.rot, s.set(0.6, b.d * 0.22, 0.6));
+  } else if (b.roofType === "reet") {
+    // Saz çatı: dik kırma çatı, saçak duvarın altına iner, kalın kenar.
+    const r = b.w / b.d;
+    const k = HIP_RATIOS.reduce((best, x, i) => (Math.abs(x - r) < Math.abs(HIP_RATIOS[best] - r) ? i : best), 0);
+    B.reet[k].add(local(b, 0, h - 0.6, 0), b.rot, s.set(b.w + 1.6, Math.min(b.w, b.d) * 0.62, b.d + 1.6), b.roof);
   } else if (b.roofType === "gable") {
-    // Endüstriyel yapılarda çatı basık (sac, düşük eğim).
-    const rh = b.industrial ? Math.min(2.6, b.d * 0.16) : Math.min(5, b.w * 0.35);
-    B.gable.add(local(b, 0, h, 0), b.rot + Math.PI / 2, s.set(b.d + 0.8, rh, b.w + 0.8), b.roof);
+    // Endüstriyel yapılarda çatı basık (sac, düşük eğim). Diğerlerinde alınlık sokağa bakar (Giebelhaus); basamaklı
+    // alınlıkta (stufen) çatı alınlığın arkasında kalır.
+    const rh = b.industrial ? Math.min(2.6, b.d * 0.16) : Math.min(st.stufen ? 7 : 5.5, b.w * (st.giebel || st.stufen ? 0.55 : 0.35));
+    B.gable.add(local(b, 0, h, 0), b.rot + Math.PI / 2, s.set(b.d + (st.stufen ? 0 : 0.8), rh, b.w + (st.stufen ? 0.1 : 0.8)), b.roof);
+    if (st.stufen) stepGable(B, b, h, rh);
   } else {
     B.walls.add(local(b, 0, h, 0), b.rot, s.set(b.w + 0.3, 0.12, b.d + 0.3), "#d6d0c6");
     for (const [lx, lz, w, d] of [[0, b.d / 2, b.w + 0.3, 0.3], [0, -b.d / 2, b.w + 0.3, 0.3], [b.w / 2, 0, 0.3, b.d], [-b.w / 2, 0, 0.3, b.d]]) {
@@ -505,170 +518,172 @@ export function drawBuilding(K, b, maxFloors = Infinity) {
   }
 }
 
-const BRICKS = new Set(["#a34a3a", "#9b4a3a", "#b0533f", "#8a3e32"]);
+const BRICKS = new Set(["#a34a3a", "#9b4a3a", "#b0533f", "#8a3e32", "#9a3f30", "#a2452f", "#8e3a2c", "#7f3a2e", "#a65a3c"]);
 function isBrick(b) {
   return !!b.style?.brick || BRICKS.has(b.wall);
 }
 
-/** ABD bayrağı: kırmızı-beyaz çizgiler ve sol üstte lacivert kanton (yandan bakınca levha). w genişlik. */
+/** Almanya bayrağı (yandan bakınca levha): siyah-kırmızı-altın yatay şeritler. w genişlik. */
 export function usFlag(B, b, lx, ly, lz, w) {
-  const hgt = w * 0.53;
-  B.signs.add(local(b, lx, ly, lz), b.rot, s.set(w, hgt, 0.03), "#f4f4f2");
-  for (let k = 0; k < 7; k++) B.signs.add(local(b, lx, ly + (k * 2 * hgt) / 13, lz), b.rot, s.set(w, hgt / 13, 0.04), "#b22234");
-  B.signs.add(local(b, lx - w * 0.3, ly + hgt * (6 / 13), lz), b.rot, s.set(w * 0.4, hgt * (7 / 13), 0.05), "#3c3b6e");
+  const hgt = w * 0.6;
+  [["#ffce00", 0], ["#dd0000", 1], ["#111111", 2]].forEach(([c, i]) => B.signs.add(local(b, lx, ly + (i * hgt) / 3, lz), b.rot, s.set(w, hgt / 3 + 0.01, 0.04), c));
+}
+
+/**
+ * Basamaklı alınlık (Treppengiebel): ön ve arka cephede, alınlık üçgeninin üstüne taşan klinker basamaklar ve tepede
+ * küçük kule; Kuzey Alman tuğla gotiği. rh: çatı yüksekliği.
+ */
+function stepGable(B, b, h, rh) {
+  const n = 5, wall = b.wall;
+  for (const side of [1, -1]) {
+    const z = side * (b.d / 2 - 0.25);
+    for (let k = 0; k < n; k++) {
+      const w = b.w * (1 - k / n) + 0.2, y = h + (k * rh) / n;
+      B.brick.add(local(b, 0, y, z), b.rot, s.set(w, rh / n + 0.6, 0.55), wall);
+      // Basamak başlıkları (açık taş) iki uçta.
+      for (const e of [-1, 1]) B.trims.add(local(b, e * (w / 2 - 0.15), y + rh / n + 0.55, z), b.rot, s.set(0.5, 0.14, 0.62), "#e8e2d4");
+    }
+    B.brick.add(local(b, 0, h + rh + 0.2, z), b.rot, s.set(0.9, 1.6, 0.6), wall); // tepe kulesi
+    // Alınlıkta kör pencereler (beyaz sıvalı nişler).
+    for (let k = 0; k < 3; k++) B.trims.add(local(b, (k - 1) * b.w * 0.18, h + rh * 0.3, z + side * 0.29), b.rot, s.set(0.7, rh * 0.32, 0.04), "#efe9dc");
+  }
 }
 
 const SHUTTERS = ["#1f2a24", "#2f4256", "#2e2e2e", "#5a2a24", "#3e5a44"];
 const PORCH = "#f7f5f0";
 
 /**
- * Amerikan evleri (layout.js HOUSE_DIMS): Cape Cod kulübesi (tek kat, dik beşik çatı, iki çatı penceresi, kapı
- * sundurması), iki aileli ev (sokağa bakan alınlık, iki katlı ön veranda), four-square (kırma çatı, ön çatı penceresi,
- * boydan veranda), garden apartment (3 kat, ortada giriş saçağı). Pencereler kepenkli; daire sahibi pencereye bağlı.
+ * Kuzey Alman evleri (layout.js HOUSE_DIMS): Friesenhaus (tek kat klinker, dik saz kırma çatı, kapının üstünde tuğla
+ * Zwerchgiebel, yeşil kepenkli beyaz pencereler, ikiye bölünmüş Klöntür), Zweifamilienhaus (iki kat, saçağı sokağa
+ * bakan kiremit çatı, giriş saçağı), Kapitänshaus (iki kat, simetrik cephe, kırma çatı, sütunlu giriş), Mehrfamilienhaus
+ * (üç kat klinker, balkonlar, ortada giriş). Veranda, posta kutusu, beyaz çit yok. Daire sahibi pencereye bağlı.
  */
 function drawHouse(K, b, floors, full, addWindow) {
   const { B } = K;
   const h = floors * FLOOR_H;
   const seed = b.pathSeed ?? 1;
-  const sh = SHUTTERS[seed % SHUTTERS.length];
+  const sh = ["#2e5e3a", "#2f5d8a", "#2e5e3a", "#3e7a5a", "#1f3f5f"][seed % 5]; // Friesen yeşili ağırlıklı
   const tip = b.house;
-  // Pencerenin dairesi iç planla aynı (unitLayout); çekirdeğin penceresi merdiven boşluğunu aydınlatır.
   const plan = unitLayout(b);
   const unit = (f, lx) => {
     const u = plan.units.find((q) => lx >= q.x0 - 0.01 && lx <= q.x1 + 0.01);
     const k = u ? f * b.perFloor + u.col : Infinity;
     return k < b.daireler ? { slot: b.slot0 + k } : { workplace: "merdiven", seed: f };
   };
-  const win = (lx, ly, side, w, hh, owner, shutters = b.shutters) => {
+  // Pencere: beyaz çerçeve, ortada kayıt (kreuzförmig), isteğe bağlı kepenk.
+  const win = (lx, ly, side, w, hh, owner, shutters = false) => {
     addWindow(b, lx, ly, side, w, hh, owner);
-    if (shutters) for (const e of [-1, 1]) B.signs.add(local(b, lx + e * (w / 2 + 0.3), ly - 0.05, side * (b.d / 2 + 0.06)), b.rot, s.set(0.42, hh + 0.1, 0.06), sh);
+    B.frames.add(local(b, lx, ly + hh / 2 - 0.08, side * (b.d / 2 + 0.13)), b.rot, s.set(0.06, hh, 0.04));
+    B.frames.add(local(b, lx, ly + hh * 0.62 - 0.08, side * (b.d / 2 + 0.13)), b.rot, s.set(w, 0.06, 0.04));
+    if (shutters) for (const e of [-1, 1]) B.signs.add(local(b, lx + e * (w / 2 + 0.32), ly - 0.05, side * (b.d / 2 + 0.06)), b.rot, s.set(0.46, hh + 0.1, 0.06), sh);
   };
-  const sideWins = (f, ly, list) => {
+  const sideWins = (f, ly, list, w = 0.9, hh = 1.25) => {
     for (const side of [-1, 1]) {
       const fake = { ...b, rot: b.rot + (side * Math.PI) / 2, w: b.d, d: b.w };
-      for (const lx of list) addWindow(fake, lx, ly, 1, 0.9, 1.25, unit(f, -side * b.w / 2));
+      for (const lx of list) addWindow(fake, lx, ly, 1, w, hh, unit(f, -side * b.w / 2));
     }
   };
-  // Köşe pervazları (beyaz) ve ön kapı.
-  for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.trims.add(local(b, lx * (b.w / 2 + 0.02), -0.2, lz * (b.d / 2 + 0.02)), b.rot, s.set(0.22, h + 0.2, 0.22), "#f7f5f0");
-  const door = (lx, w = 1.0) => ({ idx: B.doors.add(local(b, lx, 0.55, b.d / 2 + 0.02), b.rot, s.set(w, 2.2, 0.1), ["#2f4256", "#5a2a24", "#2e2e2e", "#3e5a44", "#f4f1ea"][(seed >> 3) % 5]), x: lx, y: 0.55, z: b.d / 2 + 0.02, w, h: 2.2 });
-  // Basamak ve ön veranda zemini.
-  const porchDeck = (lx, w, d, y = 0.5) => {
-    B.slabs.add(local(b, lx, y - 0.1, b.d / 2 + d / 2), b.rot, s.set(w, 0.12, d), "#cfc6b8");
-    B.plinth.add(local(b, lx, -0.6, b.d / 2 + d / 2), b.rot, s.set(w, y + 0.5, d));
+  const doorCol = ["#2e5e3a", "#1f3f5f", "#7a1f1f", "#2f5d8a", "#f4f1ea"][(seed >> 3) % 5];
+  const door = (lx, w = 1.0) => {
+    const d = { idx: B.doors.add(local(b, lx, 0.25, b.d / 2 + 0.02), b.rot, s.set(w, 2.2, 0.1), doorCol), x: lx, y: 0.25, z: b.d / 2 + 0.02, w, h: 2.2 };
+    B.trims.add(local(b, lx, 1.35, b.d / 2 + 0.08), b.rot, s.set(w + 0.06, 0.06, 0.04), "#f4f1ea"); // Klöntür: ortadan bölünmüş
+    B.slabs.add(local(b, lx, 0.05, b.d / 2 + 0.5), b.rot, s.set(w + 0.8, 0.22, 0.9), "#9c9fa3"); // taş basamak
+    return d;
   };
-  const posts = (lx0, lx1, z, y, hh, n) => {
-    for (let i = 0; i < n; i++) B.trims.add(local(b, lx0 + ((lx1 - lx0) * i) / (n - 1), y, z), b.rot, s.set(0.2, hh, 0.2), PORCH);
-  };
-  const railing = (lx0, lx1, z, y) => {
-    B.trims.add(local(b, (lx0 + lx1) / 2, y + 0.85, z), b.rot, s.set(lx1 - lx0, 0.08, 0.1), PORCH);
-    B.trims.add(local(b, (lx0 + lx1) / 2, y + 0.12, z), b.rot, s.set(lx1 - lx0, 0.06, 0.08), PORCH);
-    for (let x = lx0 + 0.2; x < lx1 - 0.1; x += 0.25) B.trims.add(local(b, x, y + 0.12, z), b.rot, s.set(0.04, 0.75, 0.04), PORCH);
+  const canopy = (lx, w) => {
+    B.slabs.add(local(b, lx, 2.65, b.d / 2 + 0.55), b.rot, s.set(w, 0.1, 1.1), "#3c3f45");
+    for (const e of [-1, 1]) B.rails.add(local(b, lx + e * (w / 2 - 0.1), 2.15, b.d / 2 + 1.05), b.rot, s.set(0.05, 0.5, 0.05));
   };
 
   if (tip === "friesenhaus") {
-    // Cape Cod: ortada kapı ve iki yanında kepenkli pencereler; dik çatı, iki çatı penceresi, yan bacası.
-    win(-2.4, 0.95, 1, 1.0, 1.35, unit(0, -1));
-    win(2.4, 0.95, 1, 1.0, 1.35, unit(0, 1));
-    win(-2.2, 0.95, -1, 1.0, 1.25, unit(0, -1), false);
-    win(2.2, 0.95, -1, 1.0, 1.25, unit(0, 1), false);
-    b.door = door(0);
-    porchDeck(0, 2.6, 1.6, 0.45);
+    // Ortada kapı ve üstünde tuğla Zwerchgiebel; iki yanda kepenkli pencereler; arkada pencereler.
+    for (const lx of [-3.1, -1.7, 1.7, 3.1]) win(lx, 0.85, 1, 0.9, 1.3, unit(0, lx), b.shutters);
+    for (const lx of [-2.6, 0, 2.6]) win(lx, 0.85, -1, 0.9, 1.2, unit(0, lx));
+    b.door = door(0, 1.05);
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.trims.add(local(b, lx * (b.w / 2), -0.3, lz * (b.d / 2)), b.rot, s.set(0.3, h + 0.2, 0.3), "#e8e2d4"); // köşe taşı
     if (full) {
-      const rh = 4.2;
-      B.gable.add(local(b, 0, h, 0), b.rot, s.set(b.w + 0.6, rh, b.d + 0.9), b.roof);
-      // Kapı sundurması: iki ince direk, küçük alınlık.
-      posts(-1.0, 1.0, b.d / 2 + 1.25, 0.45, 2.35, 2);
-      B.gable.add(local(b, 0, 2.8, b.d / 2 + 0.85), b.rot + Math.PI / 2, s.set(1.9, 0.7, 2.6), b.roof);
-      for (const lx of [-2.2, 2.2]) {
-        B.walls.add(local(b, lx, h + 0.55, b.d / 4 - 0.2), b.rot, s.set(1.6, 1.5, 2.2), b.wall);
-        B.gable.add(local(b, lx, h + 2.05, b.d / 4 - 0.2), b.rot + Math.PI / 2, s.set(2.4, 0.8, 1.9), b.roof);
-        addWindow({ ...b, d: b.d / 2 + 1.5 }, lx, h + 0.75, 1, 0.8, 0.9, unit(0, lx));
-      }
-      B.chimneys.add(local(b, -b.w / 2 + 0.9, h - 0.2, -0.6), b.rot, s.set(0.9, rh + 0.6, 0.9), "#8a4a3a");
-      // Çatı arası penceresi (yan alınlıklar).
-      for (const side of [-1, 1]) {
-        const fake = { ...b, rot: b.rot + (side * Math.PI) / 2, w: b.d, d: b.w };
-        addWindow(fake, 0, h + 1.0, 1, 0.8, 0.9, unit(0, 0));
-      }
+      const rh = 4.6;
+      B.reet[1].add(local(b, 0, h - 0.55, 0), b.rot, s.set(b.w + 1.4, rh, b.d + 1.5), b.roof);
+      // Zwerchgiebel: kapının üstünde öne çıkan tuğla alınlık ve kendi küçük saz çatısı.
+      B.brick.add(local(b, 0, h - 0.6, b.d / 2 - 0.4), b.rot, s.set(3.4, 2.4, 1.4), b.wall);
+      B.reetGable.add(local(b, 0, h + 1.75, b.d / 2 - 1.2), b.rot + Math.PI / 2, s.set(3.6, 1.6, 4.0), b.roof);
+      addWindow({ ...b, d: b.d + 0.5 }, 0, h - 0.05, 1, 0.9, 1.0, unit(0, 0));
+      B.chimneys.add(local(b, 0, h + 1.4, -0.4), b.rot, s.set(0.8, 3.8, 0.8), "#8e3a2c");
     }
     return;
   }
 
   if (tip === "doppelhaus") {
-    // İki aileli ev: alınlık sokağa bakar; zemin ve üst kat birer daire, iki katlı ön veranda. Merdiven sol yan
-    // duvar boyunca (unitLayout çekirdeği): önde merdiven kapısı, yanında zemin kat dairesinin kapısı.
+    // Zweifamilienhaus: iki kat, saçağı sokağa bakan kiremit çatı; zemin ve üst kat birer daire, iki kapı.
     for (let f = 0; f < floors; f++) {
-      win(1.9, f * FLOOR_H + 0.95, 1, 1.0, 1.4, unit(f, 1.9));
-      if (f > 0) win(-0.9, f * FLOOR_H + 0.95, 1, 1.0, 1.4, unit(f, -0.9));
-      for (const lx of [-0.6, 2.4]) addWindow(b, lx, f * FLOOR_H + 0.95, -1, 1.0, 1.3, unit(f, lx));
+      for (const lx of f === 0 ? [1.9, 3.2] : [-2.6, -0.8, 1.9, 3.2]) win(lx, f * FLOOR_H + 0.9, 1, 0.9, 1.35, unit(f, lx));
+      for (const lx of [-2.4, 0, 2.4]) addWindow(b, lx, f * FLOOR_H + 0.9, -1, 0.9, 1.3, unit(f, lx));
       sideWins(f, f * FLOOR_H + 0.95, [-3.5, 0, 3.5]);
     }
     b.door = door(-0.9);
-    B.doors.add(local(b, plan.core[0] + 1.2, 0.55, b.d / 2 + 0.02), b.rot, s.set(0.9, 2.2, 0.1), "#6b4a35"); // üst kat merdiven kapısı
-    porchDeck(0, b.w + 0.2, 2.4);
-    B.slabs.add(local(b, 0, FLOOR_H + 0.4, b.d / 2 + 1.2), b.rot, s.set(b.w + 0.2, 0.15, 2.4), "#cfc6b8");
-    posts(-b.w / 2 + 0.2, b.w / 2 - 0.2, b.d / 2 + 2.25, 0.5, 2 * FLOOR_H - 0.4, 4);
-    railing(-b.w / 2 + 0.3, b.w / 2 - 0.3, b.d / 2 + 2.25, FLOOR_H + 0.45);
+    B.doors.add(local(b, plan.core[0] + 1.2, 0.25, b.d / 2 + 0.02), b.rot, s.set(0.9, 2.2, 0.1), doorCol); // üst kat kapısı
+    canopy(-0.4, 3.4);
     if (full) {
-      B.slabs.add(local(b, 0, 2 * FLOOR_H + 0.05, b.d / 2 + 1.2), b.rot, s.set(b.w + 0.4, 0.18, 2.6), b.roof);
-      B.gable.add(local(b, 0, h, 0), b.rot + Math.PI / 2, s.set(b.d + 0.8, 3.8, b.w + 0.7), b.roof);
-      addWindow(b, 0, h + 1.0, 1, 0.9, 1.1, unit(floors - 1, 0)); // çatı arası
-      B.chimneys.add(local(b, 2.6, h + 1.0, -2.5), b.rot, s.set(0.7, 3.2, 0.7), "#8a4a3a");
+      B.gable.add(local(b, 0, h, 0), b.rot, s.set(b.w + 0.7, 3.6, b.d + 0.8), b.roof);
+      B.walls.add(local(b, 1.8, h + 0.35, b.d / 4), b.rot, s.set(2.2, 1.4, 2.4), "#efe9dc"); // çatı penceresi (Gaube)
+      B.gable.add(local(b, 1.8, h + 1.75, b.d / 4), b.rot + Math.PI / 2, s.set(2.6, 0.7, 2.6), b.roof);
+      addWindow({ ...b, d: b.d / 2 + 2.4 }, 1.8, h + 0.55, 1, 1.0, 0.8, unit(floors - 1, 1.8));
+      B.chimneys.add(local(b, -2.6, h + 1.6, -2.5), b.rot, s.set(0.7, 3.0, 0.7), "#8e3a2c");
     }
     return;
   }
 
   if (tip === "kapitaenshaus") {
-    // Four-square: her katta iki daire, boydan zemin kat verandası, kırma çatı ve ön çatı penceresi.
+    // Kapitänshaus: simetrik iki kat, katta iki daire; ortada sütunlu giriş ve üstünde balkon; kırma çatı, beyaz silme.
     for (let f = 0; f < floors; f++) {
-      for (const lx of [-4.4, -2.0, 2.0, 4.4]) {
-        if (f === 0 && Math.abs(lx) < 2.5) continue;
-        win(lx, f * FLOOR_H + 0.95, 1, 1.0, 1.4, unit(f, lx));
-      }
-      for (const lx of [-4.2, -1.6, 1.6, 4.2]) addWindow(b, lx, f * FLOOR_H + 0.95, -1, 1.0, 1.3, unit(f, lx));
+      for (const lx of [-4.6, -2.4, 2.4, 4.6]) win(lx, f * FLOOR_H + 0.9, 1, 1.0, 1.45, unit(f, lx));
+      if (f > 0) win(0, f * FLOOR_H + 0.4, 1, 1.1, 2.0, unit(f, 0));
+      for (const lx of [-4.2, -1.6, 1.6, 4.2]) addWindow(b, lx, f * FLOOR_H + 0.9, -1, 1.0, 1.3, unit(f, lx));
       sideWins(f, f * FLOOR_H + 0.95, [-4, 0, 4]);
     }
     b.door = door(0, 1.4);
-    porchDeck(0, b.w + 0.2, 2.6);
-    posts(-b.w / 2 + 0.2, b.w / 2 - 0.2, b.d / 2 + 2.45, 0.5, FLOOR_H - 0.3, 5);
-    railing(-b.w / 2 + 0.3, -1.2, b.d / 2 + 2.45, 0.5);
-    railing(1.2, b.w / 2 - 0.3, b.d / 2 + 2.45, 0.5);
-    B.slabs.add(local(b, 0, FLOOR_H + 0.2, b.d / 2 + 1.3), b.rot, s.set(b.w + 0.4, 0.18, 2.8), b.roof);
+    for (const e of [-1, 1]) B.trims.add(local(b, e * 1.3, 0, b.d / 2 + 1.3), b.rot, s.set(0.35, FLOOR_H, 0.35), "#f4f1ea");
+    B.slabs.add(local(b, 0, FLOOR_H - 0.1, b.d / 2 + 0.75), b.rot, s.set(3.4, 0.2, 1.6), "#f4f1ea");
+    B.rails.add(local(b, 0, FLOOR_H + 0.85, b.d / 2 + 1.5), b.rot, s.set(3.4, 0.05, 0.05));
+    B.railPanels.add(local(b, 0, FLOOR_H + 0.42, b.d / 2 + 1.5), b.rot, s.set(3.4, 0.85, 1));
+    B.trims.add(local(b, 0, h - 0.35, 0), b.rot, s.set(b.w + 0.3, 0.35, b.d + 0.3), "#f4f1ea");
     if (full) {
-      B.hips[0].add(local(b, 0, h, 0), b.rot, s.set(b.w + 1.0, 3.6, b.d + 1.0), b.roof);
-      B.walls.add(local(b, 0, h + 0.6, b.d / 2 - 2.2), b.rot, s.set(2.2, 1.5, 2.4), b.wall);
-      B.hips[0].add(local(b, 0, h + 2.1, b.d / 2 - 2.2), b.rot, s.set(2.8, 0.8, 2.9), b.roof);
-      addWindow({ ...b, d: b.d - 2.0 }, 0, h + 0.8, 1, 1.2, 0.8, unit(floors - 1, 0));
-      B.chimneys.add(local(b, 3.2, h + 1.5, -1.8), b.rot, s.set(0.8, 3.2, 0.8), "#8a4a3a");
+      B.hips[0].add(local(b, 0, h, 0), b.rot, s.set(b.w + 1.0, 3.8, b.d + 1.0), b.roof);
+      B.chimneys.add(local(b, 3.2, h + 1.6, -1.8), b.rot, s.set(0.8, 3.2, 0.8), "#8e3a2c");
+      B.chimneys.add(local(b, -3.2, h + 1.6, -1.8), b.rot, s.set(0.8, 3.2, 0.8), "#8e3a2c");
     }
     return;
   }
 
-  // Garden apartment: her katta altı pencere çifti; ortada giriş, üstünde saçak; yanlarda pencere.
+  // Mehrfamilienhaus: üç kat klinker, katta üç daire; üst katlarda küçük balkonlar, ortada giriş ve merdiven pencereleri.
   const cols = [-11.5, -8.5, -4.5, -1.5, 1.5, 4.5, 8.5, 11.5];
   for (let f = 0; f < floors; f++) {
     for (const lx of cols) {
       if (f === 0 && Math.abs(lx) < 2) continue;
-      win(lx, f * FLOOR_H + 0.95, 1, 1.1, 1.4, unit(f, lx), b.shutters && Math.abs(lx) > 2);
-      addWindow(b, lx, f * FLOOR_H + 0.95, -1, 1.1, 1.3, unit(f, lx));
+      win(lx, f * FLOOR_H + 0.9, 1, 1.1, 1.4, unit(f, lx));
+      addWindow(b, lx, f * FLOOR_H + 0.9, -1, 1.1, 1.3, unit(f, lx));
     }
     sideWins(f, f * FLOOR_H + 0.95, [-3.5, 3.5]);
-    if (f > 0) addWindow(b, 0, f * FLOOR_H - 0.5, 1, 0.9, 1.2, { workplace: "merdiven", seed: f });
+    if (f > 0) {
+      addWindow(b, 0, f * FLOOR_H - 0.5, 1, 0.9, 1.2, { workplace: "merdiven", seed: f });
+      for (const ux of [-10, 6.5]) { // balkon
+        B.slabs.add(local(b, ux, f * FLOOR_H - 0.05, b.d / 2 + 0.6), b.rot, s.set(3.2, 0.15, 1.2), "#d8d2c4");
+        B.rails.add(local(b, ux, f * FLOOR_H + 1.0, b.d / 2 + 1.17), b.rot, s.set(3.22, 0.05, 0.06));
+        B.railPanels.add(local(b, ux, f * FLOOR_H + 0.55, b.d / 2 + 1.17), b.rot, s.set(3.2, 0.9, 1));
+      }
+    }
   }
   b.door = door(0, 1.6);
-  B.slabs.add(local(b, 0, 2.75, b.d / 2 + 0.9), b.rot, s.set(3.2, 0.15, 1.8), "#f7f5f0");
-  posts(-1.4, 1.4, b.d / 2 + 1.7, 0, 2.75, 2);
-  B.slabs.add(local(b, 0, 0, b.d / 2 + 0.9), b.rot, s.set(3.2, 0.15, 1.8), "#cfc6b8");
+  canopy(0, 3.2);
   if (full) {
-    B.gable.add(local(b, 0, h, 0), b.rot, s.set(b.w + 0.8, 3.2, b.d + 0.9), b.roof);
-    for (const lx of [-8, 8]) B.chimneys.add(local(b, lx, h + 0.6, -1.5), b.rot, s.set(0.8, 3.0, 0.8), "#8a4a3a");
+    B.gable.add(local(b, 0, h, 0), b.rot, s.set(b.w + 0.8, 3.4, b.d + 0.9), b.roof);
+    for (const lx of [-8, 8]) B.chimneys.add(local(b, lx, h + 0.6, -1.5), b.rot, s.set(0.8, 3.0, 0.8), "#8e3a2c");
   }
 }
 
 /**
- * Beyaz ahşap New England kilisesi: sokağa bakan alınlık, yanlarda uzun pencereler, önde kule (kaide, açık çan katı,
- * sekizgen külah). (Ön cephe +z.)
+ * Kuzey Alman tuğla köy kilisesi: uzun kemerli pencereler (koyu çerçeve), payandalar, kiremit çatı; önde kare tuğla
+ * kule, saat kadranları, çan katı panjurları ve dik piramit külah (koyu arduvaz), tepede yelkovan. (Ön cephe +z.)
  */
 function drawChurch(K, b, floors, full, h, addGlass) {
   const { B } = K;
@@ -676,30 +691,31 @@ function drawChurch(K, b, floors, full, h, addGlass) {
     const fake = { ...b, rot: b.rot + (side * Math.PI) / 2, w: b.d, d: b.w };
     for (let k = 0; k < 4; k++) {
       const lx = -b.d / 2 + 3 + k * ((b.d - 6) / 3);
-      B.frames.add(local(fake, lx, 1.2, b.w / 2), fake.rot, s.set(1.5, 4.0, 0.14), "#f7f5f0");
-      addGlass(fake, lx, 3.2, b.w / 2 + 0.09, 1.1, 3.6, false, { workplace: "cami", seed: k + (side > 0 ? 10 : 0) });
-      B.arches.add(local(fake, lx, 5.0, b.w / 2 + 0.03), fake.rot, s.set(0.7, 1, 0.15), "#f7f5f0");
-      for (const e of [-1, 1]) B.signs.add(local(fake, lx + e * 1.05, 1.2, b.w / 2 + 0.06), fake.rot, s.set(0.45, 3.9, 0.06), "#2e2e2e");
+      B.frames.add(local(fake, lx, 1.4, b.w / 2), fake.rot, s.set(1.3, 3.8, 0.14), "#e8e2d4");
+      addGlass(fake, lx, 3.3, b.w / 2 + 0.09, 0.95, 3.4, false, { workplace: "cami", seed: k + (side > 0 ? 10 : 0) });
+      B.arches.add(local(fake, lx, 5.0, b.w / 2 + 0.03), fake.rot, s.set(0.65, 1, 0.15), "#e8e2d4");
+      if (k < 3) B.brick.add(local(fake, lx + (b.d - 6) / 6, -0.4, b.w / 2 + 0.35), fake.rot, s.set(0.7, h * 0.85, 0.7), b.wall); // payanda
     }
   }
-  for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.trims.add(local(b, lx * (b.w / 2 + 0.03), -0.2, lz * (b.d / 2 + 0.03)), b.rot, s.set(0.3, h + 0.2, 0.3), "#ffffff");
-  // Ön kule: kapı kulenin dibinde.
-  const tz = b.d / 2 + 2.0;
-  B.walls.add(local(b, 0, -0.8, tz), b.rot, s.set(4.4, h + 3.6, 4.4), b.wall);
-  b.door = { idx: B.doors.add(local(b, 0, 0.2, tz + 2.22), b.rot, s.set(1.8, 3.0, 0.1), "#7a2a24"), y: 0.2, z: tz + 2.22, w: 1.8, h: 3.0 };
-  B.gable.add(local(b, 0, 3.4, tz + 2.3), b.rot + Math.PI / 2, s.set(0.5, 0.9, 2.6), "#ffffff");
-  B.frames.add(local(b, 0, h - 0.6, tz + 2.21), b.rot, s.set(1.1, 1.8, 0.1), "#2e2e2e");
-  B.slabs.add(local(b, 0, -0.05, tz + 3.3), b.rot, s.set(4.0, 0.25, 2.2), "#cfc6b8");
+  // Ön kule (kare, tuğla): kapı kulenin dibinde; saat; çan katında panjurlu açıklıklar.
+  const tz = b.d / 2 + 2.6, tw = 5.2, th = h + 9;
+  B.brick.add(local(b, 0, -0.8, tz), b.rot, s.set(tw, th + 0.8, tw), b.wall);
+  b.door = { idx: B.doors.add(local(b, 0, 0.2, tz + tw / 2 + 0.02), b.rot, s.set(1.7, 2.9, 0.1), "#5a2a24"), y: 0.2, z: tz + tw / 2 + 0.02, w: 1.7, h: 2.9 };
+  B.arches.add(local(b, 0, 3.1, tz + tw / 2 + 0.04), b.rot, s.set(0.85, 1, 0.12), "#5a2a24");
+  B.slabs.add(local(b, 0, -0.05, tz + tw / 2 + 1.0), b.rot, s.set(3.6, 0.25, 2.0), "#9c9fa3");
+  for (const [dr, dz] of [[0, tw / 2], [Math.PI, tw / 2], [Math.PI / 2, tw / 2], [-Math.PI / 2, tw / 2]]) {
+    const fake = { ...b, rot: b.rot + dr, x: 0, z: 0 };
+    const at = (lx, ly, lz) => { const c = Math.cos(b.rot), sn = Math.sin(b.rot); const tx = b.x + tz * sn, tzz = b.z + tz * c; const c2 = Math.cos(fake.rot), s2 = Math.sin(fake.rot); return v.set(tx + lx * c2 + lz * s2, FLAT_Y + ly, tzz - lx * s2 + lz * c2); };
+    B.signs.add(at(0, th - 2.2, dz + 0.04), fake.rot, s.set(1.6, 1.6, 0.06), "#f4f1ea"); // saat kadranı
+    B.rails.add(at(0, th - 2.0, dz + 0.09), fake.rot, s.set(0.07, 0.6, 0.03));
+    for (const e of [-0.9, 0.9]) B.signs.add(at(e, th - 5.2, dz + 0.04), fake.rot, s.set(0.6, 1.9, 0.06), "#3a3530"); // panjur
+  }
+  B.trims.add(local(b, 0, th, tz), b.rot, s.set(tw + 0.4, 0.3, tw + 0.4), "#e8e2d4");
   if (!full) return;
-  B.gable.add(local(b, 0, h, 0), b.rot + Math.PI / 2, s.set(b.d + 0.8, 4.6, b.w + 0.8), b.roof);
-  const y0 = h + 2.8;
-  B.trims.add(local(b, 0, y0, tz), b.rot, s.set(4.8, 0.4, 4.8), "#ffffff");
-  // Çan katı: dört köşe direk, açık kemerler; üstte korniş ve külah.
-  for (const [lx, lz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) B.trims.add(local(b, lx, y0 + 0.4, tz + lz), b.rot, s.set(0.45, 3.2, 0.45), "#ffffff");
-  B.walls.add(local(b, 0, y0 + 0.4, tz), b.rot, s.set(1.4, 1.4, 1.4), "#2e2e2e"); // çan
-  B.trims.add(local(b, 0, y0 + 3.6, tz), b.rot, s.set(4.2, 0.45, 4.2), "#ffffff");
-  B.spires.add(local(b, 0, y0 + 4.05, tz), b.rot + Math.PI / 8, s.set(2.3, 9.5, 2.3), "#f7f5f0");
-  B.rails.add(local(b, 0, y0 + 13.4, tz), b.rot, s.set(0.08, 1.2, 0.08), "#c9a441");
+  B.gable.add(local(b, 0, h, 0), b.rot + Math.PI / 2, s.set(b.d + 0.6, 5.2, b.w + 0.8), b.roof);
+  B.spires.add(local(b, 0, th + 0.3, tz), b.rot + Math.PI / 4, s.set(3.9, 12, 3.9), "#3c3f45");
+  B.rails.add(local(b, 0, th + 12.3, tz), b.rot, s.set(0.07, 1.4, 0.07), "#c9a441");
+  B.signs.add(local(b, 0.35, th + 13.2, tz), b.rot, s.set(0.7, 0.35, 0.03), "#c9a441"); // yelkovan
 }
 
 export function buildCity(world) {
@@ -1378,7 +1394,7 @@ function buildFeatures(world) {
         const toLand = world.fener?.door ? Math.atan2(world.fener.door[0] - f.x, world.fener.door[1] - f.z) : 0;
         g.rotation.y = toLand;
         const put = (geo, mat, x, y, z, shadow = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = true; g.add(m); return m; };
-        const H = 17, r0 = 2.7, r1 = 1.95;
+        const H = f.de ? 22 : 17, r0 = f.de ? 3.3 : 2.7, r1 = f.de ? 2.5 : 1.95; // Kuzey Denizi feneri daha kalın ve yüksek
         put(new THREE.CylinderGeometry(4.3, 4.7, 1.3, 8), stone, 0, 0.65, 0);
         put(new THREE.CylinderGeometry(4.0, 4.0, 0.15, 8), std("#bdb5a8"), 0, 1.35, 0, false);
         // Gövde bantları (gövde koniği boyunca, birbirine tam oturan halkalar).
@@ -1386,7 +1402,7 @@ function buildFeatures(world) {
         for (let i = 0; i < bands; i++) {
           const ya = 1.4 + (i * (H - 1.4)) / bands, yb = 1.4 + ((i + 1) * (H - 1.4)) / bands;
           const ra = r0 + ((r1 - r0) * (ya - 1.4)) / (H - 1.4), rb = r0 + ((r1 - r0) * (yb - 1.4)) / (H - 1.4);
-          put(new THREE.CylinderGeometry(rb, ra, yb - ya, 24), std(f.abd ? "#f7f5f0" : i % 2 ? "#c8312f" : "#f7f5f0", { roughness: 0.6 }), 0, (ya + yb) / 2, 0);
+          put(new THREE.CylinderGeometry(rb, ra, yb - ya, 24), std(f.abd ? "#f7f5f0" : f.de ? (i % 2 ? "#f7f5f0" : "#b8262a") : i % 2 ? "#c8312f" : "#f7f5f0", { roughness: 0.6 }), 0, (ya + yb) / 2, 0);
         }
         // Kapı (kara tarafında) ve basamaklar; gövdede kademeli küçük pencereler.
         put(new THREE.BoxGeometry(1.1, 2.2, 0.3), std("#4a3426"), 0, 2.5, r0 - 0.05, false);
@@ -1410,7 +1426,7 @@ function buildFeatures(world) {
         put(new THREE.TorusGeometry(r1 + 0.8, 0.04, 6, 40).rotateX(Math.PI / 2), metal, 0, H + 1.2, 0, false);
         put(new THREE.TorusGeometry(r1 + 0.8, 0.025, 6, 40).rotateX(Math.PI / 2), metal, 0, H + 0.7, 0, false);
         // Fener odası: alt duvar, camlar ve kayıtlar, mercek.
-        put(new THREE.CylinderGeometry(1.45, 1.45, 0.8, 16), std(f.abd ? "#1f2224" : "#f7f5f0"), 0, H + 0.6, 0);
+        put(new THREE.CylinderGeometry(1.45, 1.45, 0.8, 16), std(f.abd || f.de ? "#1f2224" : "#f7f5f0"), 0, H + 0.6, 0);
         put(new THREE.CylinderGeometry(1.42, 1.42, 2.1, 16, 1, true), new THREE.MeshStandardMaterial({ color: "#cfe3ee", transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.4, side: THREE.DoubleSide, depthWrite: false }), 0, H + 2.05, 0, false);
         for (let k = 0; k < 10; k++) {
           const a = (k / 10) * Math.PI * 2;
@@ -1419,8 +1435,8 @@ function buildFeatures(world) {
         const lensMat = new THREE.MeshStandardMaterial({ color: "#fff6d6", emissive: new THREE.Color("#fff1c4"), emissiveIntensity: 0.15, roughness: 0.1 });
         const lens = put(new THREE.CylinderGeometry(0.55, 0.55, 1.3, 12), lensMat, 0, H + 2.0, 0, false);
         put(new THREE.CylinderGeometry(1.5, 1.5, 0.12, 16), metal, 0, H + 3.15, 0);
-        put(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), std(f.abd ? "#1f2224" : "#3e6b5a", { roughness: 0.5, metalness: 0.3 }), 0, H + 3.2, 0);
-        put(new THREE.SphereGeometry(0.28, 10, 8), std(f.abd ? "#1f2224" : "#3e6b5a", { metalness: 0.3 }), 0, H + 4.85, 0);
+        put(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), std(f.abd ? "#1f2224" : f.de ? "#8e1f1f" : "#3e6b5a", { roughness: 0.5, metalness: 0.3 }), 0, H + 3.2, 0);
+        put(new THREE.SphereGeometry(0.28, 10, 8), std(f.abd ? "#1f2224" : f.de ? "#8e1f1f" : "#3e6b5a", { metalness: 0.3 }), 0, H + 4.85, 0);
         put(new THREE.CylinderGeometry(0.03, 0.03, 1.4, 5), metal, 0, H + 5.6, 0, false);
         // Işık huzmeleri: gece görünür, yavaşça döner.
         // Huzme: kaynağında parlak, uzaklaştıkça sönen ince ışık konisi (uv.y: 1 kaynak, 0 uç).

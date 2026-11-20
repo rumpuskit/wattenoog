@@ -49,7 +49,7 @@ const VILLA_AD = ["Seeblick", "Möwe", "Strandgut", "Nordlicht", "Dünenrose", "
 
 // İş yeri türlerinin bina biçimi (metre). Tuğla ağırlıklı; Bäderarchitektur beyaz.
 const STYLES = {
-  belediye: { w: 30, d: 18, floors: 2, roof: "gable", wall: "#9a3f30", roofColor: "#3c3f45", stufen: true, brick: true, plate: "#2f4256" },
+  belediye: { w: 20, d: 28, floors: 2, roof: "gable", wall: "#9a3f30", roofColor: "#3c3f45", stufen: true, brick: true, plate: "#2f4256" },
   muze: { w: 28, d: 14, floors: 1, roof: "gable", wall: "#e9e4da", roofColor: "#4b6352", sign: "#2f6f4f" },
   kutuphane: { w: 18, d: 13, floors: 2, roof: "gable", wall: "#8e3a2c", roofColor: "#3c3f45", brick: true, giebel: true },
   saglik: { w: 36, d: 20, floors: 3, roof: "flat", wall: "#eef0f2", roofColor: "#c9c4bb", sign: "#c0392b" },
@@ -225,8 +225,9 @@ export class World {
     I.setFlatAreas([
       box({ x0: -440, x1: 480, z0: -570, z1: 640 }), box({ x0: -340, x1: 440, z0: 540, z1: 800 }),
       box({ x0: -60, x1: 60, z0: -1520, z1: -560 }), // Strandstraße'nin Kurviertel kısmı
-      { poly: [[-680, pz(-680) - 12], [-680, pz(-680) + 60], [600, pz(600) + 60], [600, pz(600) - 12]] }, // Promenade, Kurhaus, otel
+      { poly: [[-700, pz(-700) - 12], [-700, pz(-700) + 90], [620, pz(620) + 90], [620, pz(620) - 12]] }, // Promenade, Kurhaus, otel
       box({ x0: 2000, x1: 2700, z0: -300, z1: 380 }), // polder
+      box({ x0: -2940, x1: -2855, z0: -470, z1: -385 }), // Leuchtturm-Hof (bekçi evi, kafe)
       ...this.zones.map((z) => ({ poly: [[-z.hw, -12], [-z.hw, I.ZONE.depth], [z.hw, I.ZONE.depth], [z.hw, -12]].map(([u, v]) => I.zoneToWorld(z, u, v)) })),
     ]);
 
@@ -259,7 +260,8 @@ export class World {
     this._emitRows();
     this._applyStage();
     this.network = buildNetwork(this.roads);
-    if (!this.vehicles) for (const n of this.network.nodes) n.signal = false; // araç yokken trafik ışığı da yok
+    // Adada trafik ışığı yok (küçük Kuzey Denizi köyü: sağdan gelen önceliklidir).
+    for (const n of this.network.nodes) n.signal = false;
     this.roadIndex = new RoadIndex(this.roads);
     this._gradeRoads();
     for (const seat of this.seats) seat.top = this.groundY(seat.x, seat.z) + seat.h;
@@ -692,6 +694,7 @@ export class World {
   _groundY(x, z) {
     for (const p of this.piers) if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return p.top;
     for (const p of this.plazas) if (p.r && Math.hypot(x - p.x, z - p.z) < p.r) return FLAT_Y + 0.2;
+    for (const p of this.plazas) if (p.klinker && x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return FLAT_Y + 0.12; // Marktplatz döşemesi
     const hit = this.roadIndex?.at(x, z);
     if (hit) {
       const r = hit.road;
@@ -1448,7 +1451,7 @@ export class World {
     this.features.push({ type: "fener", x: lx, z: lz, de: true });
     this.block(lx - 6, lz - 6, lx + 6, lz + 6, 0);
     const lend = I.TRUNKS.find((t) => t.id === "west").pts.at(-1);
-    const fenerTrail = [lend, [-2950, -360], [-3120, -470], [lx + 7, lz + 6]];
+    const fenerTrail = [lend, [-2860, -380], [-3000, -470], [-3140, -520], [lx + 7, lz + 6]];
     this.addRoad(fenerTrail, "patika");
     const fenerPath = [...fenerTrail].reverse().concat([HUB]);
     this._addWorkplace("fener", 0, { door: [lx, lz], path: fenerPath, anchor: [lx + 4, lz + 3], spread: 2 });
@@ -1464,11 +1467,12 @@ export class World {
     }
     this._place("fener", { anchors: views.map((v) => [v.x, v.z]), spots: views, spread: 0, path: fenerPath });
     this.fener = { x: lx, z: lz, door: [lx + 4.8, lz + 1] };
-    this.addBuilding({ kind: "kulube", x: lx + 20, z: lz + 12, rot: -Math.PI / 2, w: 10, d: 7, floors: 1, roofType: "gable", wall: "#a2452f", roof: "#3c3f45", address: "Leuchtturmwärterhaus" });
+    // Bekçi evi ve kafe tepenin eteğinde, düzlenmiş küçük alanda (constructor setFlatAreas: Leuchtturm-Hof).
+    this.addBuilding({ kind: "kulube", x: -2905, z: -405, rot: Math.PI, w: 10, d: 7, floors: 1, roofType: "reet", wall: "#a2452f", roof: "#b39a5e", address: "Leuchtturmwärterhaus" });
     this._tag("kafe:3", () => {
       const st = { ...STYLES.kafe, ...BRANCH["kafe:3"] };
-      const b = this.addBuilding({ kind: "kafe", x: lx + 46, z: lz + 32, rot: -Math.PI / 2, w: 12, d: 10, floors: 1, roofType: "gable", wall: st.wall, roof: st.roofColor, style: st, workplace: true, address: "Am Leuchtturm 2" });
-      const door = [lx + 46 - 5.35, lz + 32];
+      const b = this.addBuilding({ kind: "kafe", x: -2880, z: -445, rot: -Math.PI / 2, w: 12, d: 10, floors: 1, roofType: "gable", wall: st.wall, roof: st.roofColor, style: st, workplace: true, address: "Am Leuchtturm 2" });
+      const door = [-2885.35, -445];
       this._addWorkplace("kafe", 3, { door, path: [door, ...fenerPath], anchor: door, spread: 2, building: b });
     });
     this.labels.push({ text: "Leuchtturm Westkopf", x: lx, z: lz, h: 40 });

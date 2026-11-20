@@ -529,7 +529,12 @@ export function buildGrounds(world) {
     rot = p.rot ?? 0;
     const w = p.rot != null ? p.w : p.x1 - p.x0, d = p.rot != null ? p.d : p.z1 - p.z0;
     const cx = p.rot != null ? p.cx : (p.x0 + p.x1) / 2, cz = p.rot != null ? p.cz : (p.z0 + p.z1) / 2;
-    if (p.kind === "tarla") slab(w, d, cx, cz, T.crops(CROPS[p.crop]), 2.4, 0.08);
+    if (p.kind === "tarla") {
+      // Polder: patates (koyu toprak, sıralar), kolza (Nisan–Mayıs sarı çiçek, sonra yeşil), diğerleri katalog rengi.
+      const mo = world.month ?? 9;
+      const c = p.ekin === "raps" ? (mo >= 3 && mo <= 4 ? "#e6cf35" : "#86a845") : p.ekin === "kartoffel" ? (mo >= 5 && mo <= 7 ? "#6f8f3f" : "#7a6844") : CROPS[p.crop];
+      slab(w, d, cx, cz, T.crops(c), 2.4, 0.08);
+    }
     else if (p.kind === "cimen") slab(w, d, cx, cz, T.lawn(), 0, -0.02); // patikaların (+0,035) belirgin altında: alçak açıdan çim patikanın üstüne binmesin
     else if (p.kind === "saha") {
       slab(w + 8, d + 8, cx, cz, T.paving(), 2.4, 0.06);
@@ -538,7 +543,10 @@ export function buildGrounds(world) {
       f.receiveShadow = true;
       group.add(f);
       materials.push(f.material);
-    } else if (p.kind === "pazar") slab(w, d, cx, cz, T.slabs(), 5, 0.1);
+    } else if (p.kind === "meydan" && p.klinker) slab(w, d, cx, cz, T.klinkerPaving(), 3, 0.12);
+    else if (p.kind === "tenis") slab(w, d, cx, cz, T.clay(), 0, 0.08);
+    else if (p.kind === "kleingarten") slab(w, d, cx, cz, T.lawn(), 0, -0.02);
+    else if (p.kind === "pazar") slab(w, d, cx, cz, T.slabs(), 5, 0.1);
     else if (p.kind === "avlu") slab(w, d, cx, cz, T.slabs(), 5, 0.12);
     else if (p.kind === "oyun") {
       // Kauçuk güvenlik zemini (granüllü), çevresinde taş bordür.

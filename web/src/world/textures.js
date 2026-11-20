@@ -329,6 +329,22 @@ export function brick() {
   }));
 }
 
+/** Saz çatı (Reetdach): sık dikey saz lifleri, katlar halinde hafif gölge şeritleri (gri tonlu; çatı rengiyle çarpılır). */
+export function thatch() {
+  return (cache.thatch ??= canvasTexture(256, (ctx, sz) => {
+    const rand = rng("reet");
+    ctx.fillStyle = "#cfcac0";
+    ctx.fillRect(0, 0, sz, sz);
+    for (let i = 0; i < 2600; i++) {
+      const x = rand() * sz, y = rand() * sz, l = 6 + rand() * 14, v = 150 + Math.floor(rand() * 90);
+      ctx.strokeStyle = `rgba(${v},${v - 4},${v - 14},0.55)`;
+      ctx.lineWidth = 0.8 + rand() * 0.8;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (rand() - 0.5) * 1.5, y + l); ctx.stroke();
+    }
+    for (let r = 0; r < 6; r++) { ctx.fillStyle = "rgba(0,0,0,0.10)"; ctx.fillRect(0, (r + 1) * (sz / 6) - 3, sz, 3); }
+  }));
+}
+
 /** Asfalt shingle çatı: kaydırmalı sıralar, ince yatay gölgeler (gri tonlu; çatı rengiyle çarpılır). */
 export function shingles() {
   return (cache.shingles ??= canvasTexture(128, (ctx, sz) => {
@@ -389,12 +405,12 @@ export function brickPaving() {
 export function klinkerPaving() {
   return (cache.klinkerPaving ??= canvasTexture(256, (ctx, sz) => {
     const rand = rng("klinker-doseme");
-    ctx.fillStyle = "#5a4038";
+    ctx.fillStyle = "#6d625c";
     ctx.fillRect(0, 0, sz, sz);
     const u = sz / 16; // tuğla 2u × u
     const brick = (x, y, w, h) => {
       const v = rand(), t = rand();
-      const r = 128 + Math.floor(v * 40), g = 58 + Math.floor(v * 22 + t * 8), b = 44 + Math.floor(v * 14);
+      const r = 118 + Math.floor(v * 34), g = 70 + Math.floor(v * 20 + t * 10), b = 58 + Math.floor(v * 14);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
     };
@@ -406,6 +422,21 @@ export function klinkerPaving() {
     }
     speckle(ctx, sz, rand, 3500, ["rgba(0,0,0,0.10)", "rgba(255,230,210,0.05)"], 1.2);
   }));
+}
+
+/** Tenis kortu: kırmızı kum (Sandplatz) ve beyaz çizgiler; alana bir kez gerilir (34 × 18 m). */
+export function clay() {
+  return (cache.clay ??= canvasTexture(512, (ctx, s) => {
+    const rand = rng("kum-kort");
+    ctx.fillStyle = "#b5583a"; ctx.fillRect(0, 0, s, s);
+    speckle(ctx, s, rand, 9000, ["rgba(0,0,0,0.06)", "rgba(255,220,190,0.07)"], 1.3);
+    const px = (m) => (m / 34) * s, pz = (m) => (m / 18) * s;
+    ctx.strokeStyle = "#f4efe6"; ctx.lineWidth = 3;
+    ctx.strokeRect(px(5.1), pz(3.5), px(23.8), pz(11));
+    ctx.strokeRect(px(5.1), pz(4.9), px(23.8), pz(8.2));
+    ctx.beginPath(); ctx.moveTo(px(11.4), pz(4.9)); ctx.lineTo(px(11.4), pz(13.1)); ctx.moveTo(px(22.6), pz(4.9)); ctx.lineTo(px(22.6), pz(13.1));
+    ctx.moveTo(px(11.4), pz(9)); ctx.lineTo(px(22.6), pz(9)); ctx.stroke();
+  }, false));
 }
 
 /** Biçilmiş çim (Town Green): açık ve koyu biçme şeritleri, ince çim lekesi. Alana bir kez gerilir. */

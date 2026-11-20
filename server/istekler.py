@@ -313,7 +313,7 @@ def main() -> None:
                           "yayin": publish(args.db) if uygulanan else None}, ensure_ascii=False))
         return
     rows = psql(f"""SELECT coalesce(json_agg(json_build_array(handle, tur, deger, kaynak, durum,
-                        to_char(created_at AT TIME ZONE 'America/New_York', 'MM/DD HH24:MI')) ORDER BY created_at), '[]')
+                        to_char(created_at AT TIME ZONE 'Europe/Berlin', 'DD.MM. HH24:MI')) ORDER BY created_at), '[]')
                     FROM istekler WHERE created_at > now() - make_interval(days => {int(args.gun)})""", args.db)
     for r in json.loads(rows):
         print("\t".join(map(str, r)))

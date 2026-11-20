@@ -577,7 +577,7 @@ for (const [ci, shot] of S.cekimler.entries()) {
       globalThis.__yonetmen = (dt, u) => { globalThis.__unix = u; };
       window.__step(1000 / 30);
       const dk = () => {
-        const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
+        const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
           .formatToParts(new Date(globalThis.__unix * 1000)).map((x) => [x.type, x.value]));
         return +p.hour * 60 + +p.minute + (+p.second + (globalThis.__unix % 1)) / 60;
       };

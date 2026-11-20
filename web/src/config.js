@@ -1,23 +1,22 @@
 // Yayın ayarları: hesap adı, veri adresi, taşınma saatleri.
 import { minuteOf } from "./sim.js";
+import { hourText } from "./fmt.js";
 // Sakinlerin geldiği TikTok hesabı (kullanıcı adı, @ olmadan).
 // Değişirse burası, public/gizlilik.html ve Mac'teki takip aracının config.toml'u ([wattenoog] hesap)
 // birlikte güncellenir.
 export const TIKTOK = "wattenoog";
 export const TIKTOK_URL = `https://www.tiktok.com/@${TIKTOK}`;
 export const VERI_URL = "https://wattenoog-data.rumpuskit.com/sakinler.json";
-// Taşınmalar (ABD Doğu saati, yaz saatli; sim.js kuralı): Mac'teki takip aracı bu saatlerde tam listeyi sunucuya
+// Taşınmalar (Berlin saati, yaz saatli; sim.js kuralı): Mac'teki takip aracı bu saatlerde tam listeyi sunucuya
 // yollar (config.toml tasinma_saatleri ile aynı olmalı). Mac uyuyorsa taşınma uyanınca yapılır.
 export const TASINMA_SAATLERI = [9, 15, 21];
+export { hourText };
 
-/** Saat (0-23) → "9 AM", "3 PM". */
-export const hourText = (s) => `${s % 12 || 12} ${s < 12 ? "AM" : "PM"}`;
-
-/** Sıradaki taşınmanın saati ("3 PM" ya da "tomorrow 9 AM"), ada saatiyle. */
+/** Sıradaki taşınmanın saati ("15 Uhr" ya da "morgen 9 Uhr"), ada saatiyle. */
 export function nextMove(now = Date.now()) {
   const h = minuteOf(now / 1000) / 60;
   const next = TASINMA_SAATLERI.find((s) => s > h);
-  return next != null ? hourText(next) : "tomorrow " + hourText(TASINMA_SAATLERI[0]);
+  return next != null ? hourText(next) : "morgen " + hourText(TASINMA_SAATLERI[0]);
 }
 
 // Driftwood Blimp'nin yan reklam alanları (giydirme). gorsel: 3:1 PNG/JPG (önerilen 3000×1000), public/ altında

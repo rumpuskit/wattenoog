@@ -2,7 +2,7 @@
 import * as sim from "./sim.js";
 import { HOME_LABELS, homeActivity } from "./world/life.js";
 import { TIKTOK, TIKTOK_URL, ZEPLIN_REKLAM, hourText, nextMove } from "./config.js";
-import { DAYS, clockText, feet, mph, num, ordinal, plural } from "./fmt.js";
+import { DAYS, DAYS_SHORT, clockText, kmh, meter, num, ordinal, plural } from "./fmt.js";
 import { svg, BINA_SIMGE, ARAC_SIMGE } from "./icons.js";
 import { ETKINLIK } from "./world/etkinlik.js";
 import { residentCard, shareCanvas } from "./paylas.js";
@@ -375,7 +375,7 @@ export function createUI({ residents, people, world, dollhouse, stories, traffic
       $("card-now").textContent = z.visible
         ? { gelis: "Flying in from the mainland", tur: "Circling over the island", donus: "Heading back to the mainland" }[z.phase]
         : m < 540 ? `On the mainland, flies in at ${hourText(9)}` : `On the mainland, back tomorrow at ${hourText(9)}`;
-      if (z.visible) rows.push(["Speed", mph(z.speed)], ["Altitude", feet(z.y)]);
+      if (z.visible) rows.push(["Tempo", kmh(z.speed)], ["Höhe", meter(z.y)]);
       rows.push(["Flights", `Daily, ${hourText(9)}–${hourText(22)}`]);
       // Pilotlar: mesleği zeplin pilotu olan sakinler (kartından açılır).
       for (let i = 0; i < residents.length; i++) if (sim.dreamJob(residents[i]).id === "zeplin_pilotu") rows.push(["Pilot", at(residents[i]), () => select(i)]);
@@ -389,13 +389,13 @@ export function createUI({ residents, people, world, dollhouse, stories, traffic
       const line = traffic.lines[r.line];
       $("card-title").textContent = `${line.name} · trip ${r.dep + 1}`;
       const n = live ? people.busSeat.get(live) ?? 0 : 0;
-      $("card-now").textContent = live ? (live.v < 0.3 ? "Waiting at a stop or a light" : mph(live.v)) : "Finished its run";
+      $("card-now").textContent = live ? (live.v < 0.3 ? "Waiting at a stop or a light" : kmh(live.v)) : "Finished its run";
       rows.push(["Riders", plural(n, "person", "people")], ["Stops", `${plural(line.stops.length, "stop")}, every ${line.headway} minutes`]);
     } else if (r.kind === "car" || r.kind === "taxi") {
       const owner = r.owner != null ? residents[r.owner] : null;
       $("card-title").textContent = r.kind === "taxi" ? "Driftwood Taxi" : owner ? `${at(owner)}'s car` : "Car";
       const done = r.key && !live; // yolculuk bitti, araç park yerinde
-      $("card-now").textContent = r.parked ? "Parked" : live ? (live.parked ? "Just parked" : live.v < 0.3 ? "Waiting" : mph(live.v)) : done ? (r.kind === "taxi" ? "Dropped off a passenger" : "Just parked") : "Waiting for a fare";
+      $("card-now").textContent = r.parked ? "Parked" : live ? (live.parked ? "Just parked" : live.v < 0.3 ? "Waiting" : kmh(live.v)) : done ? (r.kind === "taxi" ? "Dropped off a passenger" : "Just parked") : "Waiting for a fare";
       if (owner) rows.push([r.kind === "taxi" ? "Passenger" : "Owner", at(owner), () => select(r.owner)]);
     } else {
       $("card-title").textContent = { ambulans: yerAdi("saglik", "Driftwood Medical Center"), itfaiye: "Driftwood Fire Department", cop: "Driftwood Public Works" }[r.kind] ?? "";
@@ -649,7 +649,7 @@ export function createUI({ residents, people, world, dollhouse, stories, traffic
         clock.classList.remove("dar");
         if (clock.scrollWidth > clock.clientWidth + 1) clock.classList.add("dar");
         // Hâlâ sığmıyorsa (dar telefon, kapalı üst panel) gün kısaltılır.
-        if (clock.scrollWidth > clock.clientWidth) clock.textContent = `${clockText(minuteNow)} · ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][sim.weekday(day)]}`;
+        if (clock.scrollWidth > clock.clientWidth) clock.textContent = `${clockText(minuteNow)} · ${DAYS_SHORT[sim.weekday(day)]}`;
       }
       // Döküm benzetimden: işte, evde (uyuyanlar dahil) ve dışarıda (yolda, çarşıda, hobisinde).
       let work = 0, home = 0;

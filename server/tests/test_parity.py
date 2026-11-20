@@ -21,7 +21,7 @@ LEVELS = [0, 35, 230, 700, 2120, "inf"]  # boş ada, ilk dükkânlar, sağlık m
 def sample_handles(n: int) -> list[str]:
     rng = random.Random(42)
     alphabet = "abcdefghijklmnopqrstuvwxyz0123456789._"
-    handles = ["driftwood", "@Ali.Veli_", "zeynep_92"]
+    handles = ["wattenoog", "@Ali.Veli_", "zeynep_92"]
     while len(handles) < n:
         handles.append("".join(rng.choice(alphabet) for _ in range(rng.randint(3, 30))))
     return handles
@@ -101,13 +101,13 @@ class ParityTest(unittest.TestCase):
         # Yaz saati geçişlerinin çevresi (±3 sa, 15 dk adım), yılbaşları ve gece yarısı sınırları, 2024-2040.
         unix = []
         for y in range(2024, 2041):
-            for edge in (sim.nth_weekday(y, 3, 6, 2) * 86400 + 7 * H, sim.nth_weekday(y, 11, 6, 1) * 86400 + 6 * H):
+            for edge in (sim.nth_weekday(y, 3, 6, -1) * 86400 + H, sim.nth_weekday(y, 10, 6, -1) * 86400 + H):
                 unix += [edge + k * 900 for k in range(-12, 13)] + [edge - 1, edge + 1]
             jan1 = sim.days_from_civil(y, 1, 1)
-            unix += [jan1 * 86400 + 5 * H + k for k in (-1, 0, 1)]
-        unix += [d * 86400 + o * H + k for d in range(DAY - 3, DAY + 40) for o in (4, 5) for k in (-1, 0, 1)]
+            unix += [jan1 * 86400 - H + k for k in (-1, 0, 1)]
+        unix += [d * 86400 - o * H + k for d in range(DAY - 3, DAY + 40) for o in (1, 2) for k in (-1, 0, 1)]
         gunler = list(range(sim.days_from_civil(2024, 1, 1), sim.days_from_civil(2041, 1, 1)))
-        yerel = [[d, m] for d in (sim.nth_weekday(2026, 3, 6, 2), sim.nth_weekday(2026, 11, 6, 1), DAY) for m in range(0, 1440, 30)]
+        yerel = [[d, m] for d in (sim.nth_weekday(2026, 3, 6, -1), sim.nth_weekday(2026, 10, 6, -1), DAY) for m in range(0, 1440, 30)]
         result = subprocess.run(["node", str(VECTORS_JS), "saat"], input=json.dumps({"unix": unix, "gunler": gunler, "yerel": yerel}),
                                 capture_output=True, text=True, timeout=120, check=True)
         js = json.loads(result.stdout)
@@ -118,40 +118,52 @@ class ParityTest(unittest.TestCase):
         for (d, m), a in zip(yerel, js["yerel"]):
             self.assertEqual(a, sim.unix_of(d, m), (d, m))
 
-    def test_clock_matches_new_york(self):
-        # Açık kural, IANA America/New_York ile aynı sonucu vermeli: her geçişin çevresi ve her ayın ortası, 2007-2050
-        # (2007 öncesinde ABD'nin eski kuralı geçerliydi; ada bugünü yaşar).
+    def test_clock_matches_berlin(self):
+        # Açık kural, IANA Europe/Berlin ile aynı sonucu vermeli: her geçişin çevresi ve her ayın ortası, 1996-2050
+        # (AB'nin bugünkü kuralı 1996'dan beri; ada bugünü yaşar).
         from datetime import datetime, timezone
         from zoneinfo import ZoneInfo
-        ny = ZoneInfo("America/New_York")
-        for y in range(2007, 2051):
+        berlin = ZoneInfo("Europe/Berlin")
+        for y in range(1996, 2051):
             stamps = [sim.days_from_civil(y, m, 15) * 86400 for m in range(1, 13)]
-            for edge in (sim.nth_weekday(y, 3, 6, 2) * 86400 + 7 * H, sim.nth_weekday(y, 11, 6, 1) * 86400 + 6 * H):
+            for edge in (sim.nth_weekday(y, 3, 6, -1) * 86400 + H, sim.nth_weekday(y, 10, 6, -1) * 86400 + H):
                 stamps += [edge + k for k in (-3601, -1, 0, 1, 3599)]
             for u in stamps:
-                local = datetime.fromtimestamp(u, timezone.utc).astimezone(ny)
+                local = datetime.fromtimestamp(u, timezone.utc).astimezone(berlin)
                 self.assertEqual(sim.tz_offset(u), int(local.utcoffset().total_seconds()), u)
                 self.assertEqual(sim.civil_from_days(sim.day_of(u)), (local.year, local.month, local.day), u)
                 self.assertEqual(sim.minute_of(u), local.hour * 60 + local.minute + local.second / 60, u)
 
     def test_transition_days(self):
-        # 1 Kasım 2026: 25 saatlik gün (01:00-02:00 iki kez), 8 Mart 2026: 23 saatlik gün.
-        fall, spring = sim.days_from_civil(2026, 11, 1), sim.days_from_civil(2026, 3, 8)
+        # 25 Ekim 2026: 25 saatlik gün (02:00-03:00 iki kez), 29 Mart 2026: 23 saatlik gün.
+        fall, spring = sim.days_from_civil(2026, 10, 25), sim.days_from_civil(2026, 3, 29)
         self.assertEqual(sim.unix_of(fall + 1, 0) - sim.unix_of(fall, 0), 25 * H)
         self.assertEqual(sim.unix_of(spring + 1, 0) - sim.unix_of(spring, 0), 23 * H)
         self.assertEqual(sim.minute_of(sim.unix_of(spring, 150)), 210)  # 02:30 yaşanmaz → 03:30
+        self.assertEqual(sim.tz_offset(sim.unix_of(fall, 150)), 2 * H)  # iki kez yaşanan 02:30: ilki (yaz saati)
 
-    def test_us_holidays(self):
+    def test_easter(self):
+        # Bilinen Paskalya pazarları (Gregoryen)
         d = sim.days_from_civil
-        known = {d(2026, 1, 1): "new_year", d(2026, 1, 19): "mlk", d(2026, 2, 16): "presidents",
-                 d(2026, 5, 25): "memorial", d(2026, 6, 19): "juneteenth", d(2026, 7, 3): "independence",
-                 d(2026, 7, 4): "independence", d(2026, 9, 7): "labor", d(2026, 11, 11): "veterans",
-                 d(2026, 11, 26): "thanksgiving", d(2026, 11, 27): "black_friday", d(2026, 12, 25): "christmas",
-                 d(2027, 1, 18): "mlk", d(2027, 5, 31): "memorial", d(2027, 7, 5): "independence",
-                 d(2027, 11, 25): "thanksgiving", d(2027, 12, 24): "christmas", d(2028, 2, 21): "presidents"}
+        for y, m, g in ((2024, 3, 31), (2025, 4, 20), (2026, 4, 5), (2027, 3, 28), (2028, 4, 16), (2029, 4, 1),
+                        (2030, 4, 21), (2038, 4, 25), (2285, 3, 22), (2000, 4, 23), (1818, 3, 22)):
+            self.assertEqual(sim.easter_of(y), d(y, m, g), y)
+        js = subprocess.run(["node", "-e", "import('" + str(VECTORS_JS.parent.parent / "src" / "sim.js") +
+                             "').then(s => process.stdout.write(JSON.stringify(Array.from({length: 600}, (_, i) => s.easterOf(1700 + i)))))"],
+                            capture_output=True, text=True, timeout=60, check=True)
+        self.assertEqual(json.loads(js.stdout), [sim.easter_of(1700 + i) for i in range(600)])
+
+    def test_german_holidays(self):
+        d = sim.days_from_civil
+        known = {d(2026, 1, 1): "neujahr", d(2026, 4, 3): "karfreitag", d(2026, 4, 6): "ostermontag",
+                 d(2026, 5, 1): "maifeiertag", d(2026, 5, 14): "himmelfahrt", d(2026, 5, 25): "pfingstmontag",
+                 d(2026, 10, 3): "einheit", d(2026, 10, 31): "reformation", d(2026, 12, 25): "weihnachten1",
+                 d(2026, 12, 26): "weihnachten2", d(2027, 3, 26): "karfreitag", d(2027, 3, 29): "ostermontag",
+                 d(2027, 5, 6): "himmelfahrt", d(2027, 5, 17): "pfingstmontag"}
         for day, name in known.items():
             self.assertEqual(sim.holiday_of(day), name, sim.civil_from_days(day))
-        for day in (d(2026, 10, 31), d(2026, 7, 6), d(2026, 11, 2), d(2026, 10, 12)):
+        # tatil olmayanlar: Paskalya pazarı, Heiligabend, Silvester, Thanksgiving, kaydırma yok (3 Ekim 2026 cumartesi)
+        for day in (d(2026, 4, 5), d(2026, 12, 24), d(2026, 12, 31), d(2026, 11, 26), d(2026, 10, 2), d(2026, 10, 5), d(2026, 11, 11)):
             self.assertEqual(sim.holiday_of(day), "", sim.civil_from_days(day))
         self.assertEqual(sim.weekday(DAY), 0)
 
@@ -164,7 +176,7 @@ class ParityTest(unittest.TestCase):
         # FNV-1a referans değerleri
         self.assertEqual(sim.fnv1a(""), 0x811C9DC5)
         self.assertEqual(sim.fnv1a("a"), 0xE40C292C)
-        self.assertEqual(sim.seed_of("@Driftwood "), sim.seed_of("driftwood"))
+        self.assertEqual(sim.seed_of("@Wattenoog "), sim.seed_of("wattenoog"))
 
 
 if __name__ == "__main__":

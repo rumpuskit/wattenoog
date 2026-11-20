@@ -66,9 +66,9 @@ def seed_of(handle: str) -> int:
     return fnv1a(normalize_handle(handle))
 
 
-# --- saat ve takvim: ABD Doğu saati, yaz saatli (sim.js ile aynı açık kural; tz kütüphanesi yok) ---
-# Yaz saati (EDT, UTC−4) Mart'ın 2. pazarı 02:00 EST (= 07:00 UTC) → Kasım'ın 1. pazarı 02:00 EDT (= 06:00 UTC);
-# diğer zamanlar EST (UTC−5). Gün numarası yerel takvim günüdür.
+# --- saat ve takvim: Berlin saati, AB yaz saati (sim.js ile aynı açık kural; tz kütüphanesi yok) ---
+# Yaz saati (MESZ, UTC+2) Mart'ın son pazarı 01:00 UTC → Ekim'in son pazarı 01:00 UTC; diğer zamanlar MEZ (UTC+1).
+# Gün numarası yerel takvim günüdür.
 
 def days_from_civil(y: int, m: int, d: int) -> int:
     y -= 1 if m <= 2 else 0
@@ -106,10 +106,11 @@ def nth_weekday(y: int, m: int, wd: int, n: int) -> int:
 
 
 def tz_offset(unix: float) -> int:
-    y = civil_from_days(math.floor((unix - 5 * H) / 86400))[0]
-    start = nth_weekday(y, 3, 6, 2) * 86400 + 7 * H
-    end = nth_weekday(y, 11, 6, 1) * 86400 + 6 * H
-    return -4 * H if start <= unix < end else -5 * H
+    """Berlin: AB yaz saati (Mart son pazarı 01:00 UTC → Ekim son pazarı 01:00 UTC) +2 sa, değilse +1 sa."""
+    y = civil_from_days(math.floor((unix + H) / 86400))[0]
+    start = nth_weekday(y, 3, 6, -1) * 86400 + H
+    end = nth_weekday(y, 10, 6, -1) * 86400 + H
+    return 2 * H if start <= unix < end else H
 
 
 def day_of(unix: float) -> int:
@@ -122,7 +123,7 @@ def minute_of(unix: float) -> float:
 
 def unix_of(day: int, minute: float) -> float:
     local = day * 86400 + minute * 60
-    return local + 4 * H if tz_offset(local + 4 * H) == -4 * H else local + 5 * H
+    return local - 2 * H if tz_offset(local - 2 * H) == 2 * H else local - H
 
 
 # --- adres (address.gd) ---
@@ -336,39 +337,33 @@ def shift_of(r: dict) -> str:
     return v[roll(r["seed"], "vardiya") % len(v)] if isinstance(v, list) else v
 
 
-# ABD tatilleri (sim.js holidayOf ile aynı): sabit tarihli olan cumartesiye denk gelirse cuma, pazara denk gelirse
-# pazartesi gözlenir; değişkenler ayın n. haftanın-günü.
-FIXED_HOLIDAYS = {(1, 1): "new_year", (6, 19): "juneteenth", (7, 4): "independence", (11, 11): "veterans", (12, 25): "christmas"}
+# Alman resmî tatilleri (ülke çapındakiler + Reformationstag); hafta sonuna denk gelen kaydırılmaz. Paskalyaya bağlı
+# olanlar Gauss/Meeus hesabıyla (sim.js ile aynı).
+FIXED_HOLIDAYS = {(1, 1): "neujahr", (5, 1): "maifeiertag", (10, 3): "einheit", (10, 31): "reformation",
+                  (12, 25): "weihnachten1", (12, 26): "weihnachten2"}
+EASTER_HOLIDAYS = {-2: "karfreitag", 1: "ostermontag", 39: "himmelfahrt", 50: "pfingstmontag"}
 
 
-def _fixed_holiday(day: int) -> str:
-    _, m, d = civil_from_days(day)
-    return FIXED_HOLIDAYS.get((m, d), "")
+def easter_of(y: int) -> int:
+    """Paskalya pazarının gün numarası (Gregoryen; Meeus/Jones/Butcher)."""
+    a, b, c = y % 19, y // 100, y % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month, day = (h + l - 7 * m + 114) // 31, (h + l - 7 * m + 114) % 31 + 1
+    return days_from_civil(y, month, day)
 
 
 def holiday_of(day: int) -> str:
-    if fixed := _fixed_holiday(day):
+    y, m, d = civil_from_days(day)
+    if fixed := FIXED_HOLIDAYS.get((m, d)):
         return fixed
-    wd = weekday(day)
-    if wd == 4 and _fixed_holiday(day + 1):
-        return _fixed_holiday(day + 1)
-    if wd == 0 and _fixed_holiday(day - 1):
-        return _fixed_holiday(day - 1)
-    y, m, _ = civil_from_days(day)
-    if m == 1 and day == nth_weekday(y, 1, 0, 3):
-        return "mlk"
-    if m == 2 and day == nth_weekday(y, 2, 0, 3):
-        return "presidents"
-    if m == 5 and day == nth_weekday(y, 5, 0, -1):
-        return "memorial"
-    if m == 9 and day == nth_weekday(y, 9, 0, 1):
-        return "labor"
-    if m == 11:
-        tg = nth_weekday(y, 11, 3, 4)
-        if day == tg:
-            return "thanksgiving"
-        if day == tg + 1:
-            return "black_friday"
+    if 3 <= m <= 6:
+        return EASTER_HOLIDAYS.get(day - easter_of(y), "")
     return ""
 
 

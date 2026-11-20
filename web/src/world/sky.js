@@ -1,19 +1,19 @@
-// Gökyüzü ve gün döngüsü: güneş ve ay, adanın enlemine (New England kıyısı, ~41,3° K) göre takvim gününden ve
+// Gökyüzü ve gün döngüsü: güneş ve ay, adanın enlemine (Doğu Frizya kıyısı, ~53,75° K) göre takvim gününden ve
 // saatten hesaplanır. Gün doğumu/batımı mevsimle değişir; altın saat, alacakaranlık, yıldızlar ve ay evresi.
 import * as THREE from "three";
 import * as P from "./palette.js";
 import { tzOffset } from "../sim.js";
 
-const LAT = 41.3 * (Math.PI / 180);
-const LON = -70.1; // derece, doğu (batı eksi)
+const LAT = 53.75 * (Math.PI / 180);
+const LON = 7.5; // derece, doğu (batı eksi)
 const rad = Math.PI / 180;
 
-/** Günün saat farkı (saat; ABD Doğu, yaz saatli): öğlenki fark, geçiş gecesinin saatleri güneşi etkilemez. */
+/** Günün saat farkı (saat; Berlin, yaz saatli): öğlenki fark, geçiş gecesinin saatleri güneşi etkilemez. */
 const tzCache = new Map();
 function TZ(day) {
   let v = tzCache.get(day);
   if (v === undefined) {
-    v = tzOffset(day * 86400 + 17 * 3600) / 3600;
+    v = tzOffset(day * 86400 + 11 * 3600) / 3600;
     if (tzCache.size > 64) tzCache.clear();
     tzCache.set(day, v);
   }

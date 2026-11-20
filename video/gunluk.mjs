@@ -281,7 +281,7 @@ if (!tur || !govde.length) {
 // (kullanıcı kararı, 2 Kasım 2026: öğle videosu 18:40'ta çekilmişti). Hikâyedeki "saat" yok sayılır; yalnız
 // kullanıcı açıkça isterse --saat HH:MM.
 const istenenSaat = saat;
-saat = opt("--saat") ?? new Intl.DateTimeFormat("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+saat = opt("--saat") ?? new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
 if (!opt("--saat") && istenenSaat !== saat) console.log(`ada saati ${saat} (ET, şimdi); "${istenenSaat}" kullanılmadı`);
 // Feribot iskele çekiminde iskelede olsun (kullanıcı, 3 Kasım: "vapur yokken vapur çekilmeye çalışılıyor"): ada saatinde
 // feribot açıktaysa iskele çekimleri bir sonraki yanaşmanın 1 dk sonrasına (en çok ~17 dk ileri) alınır; diğerleri şimdi.

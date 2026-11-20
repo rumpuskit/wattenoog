@@ -123,11 +123,11 @@ export function seedOf(handle) {
   return fnv1a(normalizeHandle(handle));
 }
 
-// --- saat ve takvim: ada ABD Doğu saatiyle yaşar (America/New_York, yaz saatli) ---
+// --- saat ve takvim: ada Berlin saatiyle yaşar (Europe/Berlin, AB yaz saati) ---
 //
-// Kural açıkça burada (tz kütüphanesine güvenilmez; sim.py aynısını hesaplar): yaz saati (EDT, UTC−4) Mart'ın
-// 2. pazarı 02:00 EST'de (= 07:00 UTC) başlar, Kasım'ın 1. pazarı 02:00 EDT'de (= 06:00 UTC) biter; diğer
-// zamanlar EST (UTC−5). Geçiş günleri 23 ya da 25 saattir: yerel dakika ileri atlar ya da bir saat geri döner.
+// Kural açıkça burada (tz kütüphanesine güvenilmez; sim.py aynısını hesaplar): yaz saati (MESZ/CEST, UTC+2) Mart'ın
+// son pazarı 01:00 UTC'de (= 02:00 yerel) başlar, Ekim'in son pazarı 01:00 UTC'de (= 03:00 yaz saati) biter; diğer
+// zamanlar MEZ/CET (UTC+1). Geçiş günleri 23 ya da 25 saattir: yerel dakika ileri atlar ya da bir saat geri döner.
 // Gün numarası yerel takvim günüdür (1970-01-01'den beri).
 
 const H = 3600;
@@ -170,12 +170,12 @@ export function nthWeekday(y, m, wd, n) {
   return first + ((wd - weekday(first) + 7) % 7) + 7 * (n - 1);
 }
 
-/** Yerel saatin UTC'den farkı (saniye): yaz saatinde −4 sa, değilse −5 sa. */
+/** Yerel saatin UTC'den farkı (saniye): yaz saatinde +2 sa, değilse +1 sa. */
 export function tzOffset(unix) {
-  const y = civilFromDays(Math.floor((unix - 5 * H) / 86400))[0];
-  const start = nthWeekday(y, 3, 6, 2) * 86400 + 7 * H;
-  const end = nthWeekday(y, 11, 6, 1) * 86400 + 6 * H;
-  return unix >= start && unix < end ? -4 * H : -5 * H;
+  const y = civilFromDays(Math.floor((unix + H) / 86400))[0];
+  const start = nthWeekday(y, 3, 6, -1) * 86400 + H;
+  const end = nthWeekday(y, 10, 6, -1) * 86400 + H;
+  return unix >= start && unix < end ? 2 * H : H;
 }
 
 export function dayOf(unix) {
@@ -188,11 +188,11 @@ export function minuteOf(unix) {
   return (s < 0 ? s + 86400 : s) / 60;
 }
 
-/** Yerel gün + dakika → unix. Geri dönüşte iki kez yaşanan saat ilkini (EDT), ileri atlamada yaşanmayan saat
- * bir saat sonrasını verir. */
+/** Yerel gün + dakika → unix. Geri dönüşte iki kez yaşanan saat ilkini (yaz saati), ileri atlamada yaşanmayan
+ * saat bir saat sonrasını verir. */
 export function unixOf(day, minute) {
   const local = day * 86400 + minute * 60;
-  return tzOffset(local + 4 * H) === -4 * H ? local + 4 * H : local + 5 * H;
+  return tzOffset(local - 2 * H) === 2 * H ? local - 2 * H : local - H;
 }
 
 export function formatMinute(minute) {
@@ -369,34 +369,30 @@ export function shiftOf(r) {
   return Array.isArray(v) ? v[roll(r.seed, "vardiya") % v.length] : v;
 }
 
-// ABD tatilleri (federal; okullar kapalı). O gün yalnız hafta sonu da açık olan işler (diner, kafe, otel, sağlık,
-// fırın, market, liman...) çalışır. Sabit tarihli olan cumartesiye denk gelirse cuma, pazara denk gelirse pazartesi
-// tatil yapılır (observed). Değişken tarihliler "ayın n. haftanın-günü" kuralıyla; sim.py ile aynı hesap.
-const FIXED_HOLIDAYS = { "1-1": "new_year", "6-19": "juneteenth", "7-4": "independence", "11-11": "veterans", "12-25": "christmas" };
+// Alman resmî tatilleri (ülke çapındakiler + kuzey eyaletlerinin Reformationstag'ı; okullar kapalı). O gün yalnız
+// hafta sonu da açık olan işler (büfe, kafe, otel, sağlık, fırın, liman...) çalışır. Almanya'da hafta sonuna denk gelen
+// tatil kaydırılmaz. Paskalyaya bağlı tatiller Gauss/Meeus (anonim Gregoryen) hesabıyla; sim.py ile aynı.
+const FIXED_HOLIDAYS = { "1-1": "neujahr", "5-1": "maifeiertag", "10-3": "einheit", "10-31": "reformation", "12-25": "weihnachten1", "12-26": "weihnachten2" };
 
-function fixedHoliday(day) {
-  const [, m, d] = civilFromDays(day);
-  return FIXED_HOLIDAYS[`${m}-${d}`] ?? "";
+/** Paskalya pazarının gün numarası (Gregoryen; Meeus/Jones/Butcher). */
+export function easterOf(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return daysFromCivil(y, month, day);
 }
 
-/** O günün tatili ("" değilse kimliği: new_year, mlk, presidents, memorial, juneteenth, independence, labor,
- * veterans, thanksgiving, black_friday, christmas). Gözlenen (observed) gün de aynı kimliği verir. */
+const EASTER_HOLIDAYS = { "-2": "karfreitag", "1": "ostermontag", "39": "himmelfahrt", "50": "pfingstmontag" };
+
+/** O günün tatili ("" değilse kimliği: neujahr, karfreitag, ostermontag, maifeiertag, himmelfahrt, pfingstmontag,
+ * einheit, reformation, weihnachten1, weihnachten2). */
 export function holidayOf(day) {
-  const fixed = fixedHoliday(day);
+  const [y, m, d] = civilFromDays(day);
+  const fixed = FIXED_HOLIDAYS[`${m}-${d}`];
   if (fixed) return fixed;
-  const wd = weekday(day);
-  if (wd === 4 && fixedHoliday(day + 1)) return fixedHoliday(day + 1);
-  if (wd === 0 && fixedHoliday(day - 1)) return fixedHoliday(day - 1);
-  const [y, m] = civilFromDays(day);
-  if (m === 1 && day === nthWeekday(y, 1, 0, 3)) return "mlk";
-  if (m === 2 && day === nthWeekday(y, 2, 0, 3)) return "presidents";
-  if (m === 5 && day === nthWeekday(y, 5, 0, -1)) return "memorial";
-  if (m === 9 && day === nthWeekday(y, 9, 0, 1)) return "labor";
-  if (m === 11) {
-    const tg = nthWeekday(y, 11, 3, 4);
-    if (day === tg) return "thanksgiving";
-    if (day === tg + 1) return "black_friday";
-  }
+  if (m >= 3 && m <= 6) return EASTER_HOLIDAYS[String(day - easterOf(y))] ?? "";
   return "";
 }
 

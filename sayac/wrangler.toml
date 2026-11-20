@@ -22,7 +22,7 @@ new_sqlite_classes = ["Presence"]
 
 [[kv_namespaces]]
 binding = "SAKINLER"
-id = "BELIRLENECEK"  # başlık WATTENOOG_SAKINLER (SAKINLER Mercanada, DRIFTWOOD_SAKINLER Driftwood: ASLA onların id.si)
+id = "40175d54aec04eed9d4a3172a761508d"  # başlık WATTENOOG_SAKINLER (SAKINLER Mercanada, DRIFTWOOD_SAKINLER Driftwood: ASLA onların id.si)
 
 # Kayıt: yorumla doğrulama, ev ve gün tercihleri, anketler, saklı nesne sayacı, siteden seçim oyları (kayit.js).
 [[durable_objects.bindings]]

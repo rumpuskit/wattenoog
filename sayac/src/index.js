@@ -6,7 +6,7 @@
 import { DurableObject } from "cloudflare:workers";
 export { Kayit } from "./kayit.js";
 
-const ORIGINS = ["https://wattenoog.rumpuskit.com", "http://localhost:4183", "http://localhost:4189", "http://localhost:5173"];
+const ORIGINS = ["https://wattenoog.rumpuskit.com", "http://localhost:4193", "http://localhost:4199", "http://127.0.0.1:4193", "http://localhost:5173"];
 
 export class Presence extends DurableObject {
   async fetch(request) {

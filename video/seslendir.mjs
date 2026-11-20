@@ -3,8 +3,8 @@
 //
 //   ELEVENLABS_API_KEY=... node seslendir.mjs senaryolar/acilis.mjs
 //
-// Senaryoda: seslendirme: [{ ses: "Meydan bankları için beş kişi lazım.", yazi: "Meydan bankları için 5 kişi lazım." }, ...]
-//   ses:  okunacak metin (sayılar yazıyla, yabancı kelime ve kullanıcı adı simgesi yok)
+// Senaryoda: seslendirme: [{ ses: "Für die Bäckerei fehlen noch drei.", yazi: "Für die Bäckerei fehlen noch 3." }, ...]
+//   ses:  okunacak metin, Almanca (sayılar yazıyla, kullanıcı adı ve @ yok)
 //   yazi: altyazı (yoksa ses metni); "\n" satır kırar. Satır başına ~28 karakter, en fazla 2 satır.
 // Çıktı: cikti/<ad>/ses.mp3 (ham) ve ses.json { anahtar, sure, cumleler: [{ yazi, bas, son, kelimeler }] }
 // (kelimeler: [[kelime, başlangıç sn], ...]; çekim geçişlerini kelimeye oturtmak için).
@@ -13,10 +13,16 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+// TODO(ses seçimi, DEVIR §9.2/§13): "Inselchronist" anlatıcısının ElevenLabs ses kimliği. Almanca anadil, kuru, sakin,
+// hafif Kuzey Alman tınısı (radyo sesi değil); 3–4 aday aynı iki cümleyle örneklenir, kullanıcı dinleyip seçer. Seçilince
+// yalnız buraya yazılır (ve ANLATIM-STANDARDI.md §7'ye). Boşken sentez hata verir: kredi harcanmaz, yanlış sesle video çıkmaz.
+export const ANLATICI_SESI = null;
+
 export const SES = {
-  voice: "pYG1XNtdbvDClmVSWMC0", // ElevenLabs kütüphanesi: "Rae" (kuru ama sıcak, Doğu Kıyısı; kullanıcı 1 Kasım'da seçti)
+  voice: ANLATICI_SESI,
   model_id: "eleven_v4",
-  language_code: "en",
+  language_code: "de",
+  // Mercanada/Driftwood ayarlarıyla başlanır (DEVIR §9.2); ses seçilince gerekirse ayarlanır.
   voice_settings: { stability: 0.7, similarity_boost: 0.8, style: 0, use_speaker_boost: true, speed: 1.05 },
 };
 
@@ -36,6 +42,7 @@ export async function seslendir(S) {
       return eski;
     }
   }
+  if (!SES.voice) throw new Error("anlatıcı sesi seçilmedi: seslendir.mjs ANLATICI_SESI boş (TODO; kullanıcı ElevenLabs'ten Almanca ses seçecek). Seslendirme yapılmadı, kredi harcanmadı.");
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) throw new Error("ELEVENLABS_API_KEY yok (seslendirme değişti, yeniden üretilmeli)");
   const { voice, ...body } = SES;

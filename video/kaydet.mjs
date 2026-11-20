@@ -15,7 +15,8 @@
 //            koşulları (kel değil vb.)
 //   yazilar: [{ metin, alt?, bas, son, yer: "ust" | "orta" | "alt" }]
 //   arayuz:  true ise sitenin üst bilgisi görünür (diğer paneller hep gizli); kart: true ise sakin kartı da
-//   yorunge: { hedef: "siradaki" | "iskele" | "fener" | "meydan" | "kilise" | "ilkev" | [x, z], r, h, a0, a1, bak } hedefin
+//   yorunge: { hedef: "siradaki" | "iskele" | "fener" | "meydan" | "kilise" | "ilkev" | "bayrak" | "watt" | "strand" |
+//            "muehle" | "wasserturm" | [x, z], r, h, a0, a1, bak } hedefin
 //            çevresinde a0'dan a1'e (radyan) dönen kamera; hedef sitede o anda hesaplanır (ör. sıradaki şantiye).
 //            "zeplin": uçan zeplinin yanında, gidiş yönüne göre a açısında (h zeplinin altı/üstü); "zeplin-yer":
 //            vapur iskelesinden (önü açık) zeplini izleyen sabit kamera.
@@ -106,7 +107,8 @@ const XFADE = { kesme: "custom:expr='if(gt(P,0.5),A,B)'", solma: "fade", kaydir:
 
 // --- Hareket dili (16 Kasım 2026, kullanıcı: "sürekli bir yerlere yaklaşan çekimler yerine daha karışık, dikkat çekici") ---
 // Senaryodaki çekimde hareket: { tur, hedef, a, D, H, bak?, yon?, fov?, aciSabit?, arac? }. Sayfada her karede kamerayı
-// kurar. hedef: [x, y, z] | [x, z] | "meydan" | "iskele" | "fener" | "kilise" | "ilkev" | "siradaki" | "isyeri:<tür>:<n>" | "zeplin" | "olay" |
+// kurar. hedef: [x, y, z] | [x, z] | "meydan" | "iskele" | "fener" | "kilise" | "ilkev" | "siradaki" | "bayrak" | "watt" |
+// "strand" | "muehle" | "wasserturm" | "isyeri:<tür>:<n>" | "zeplin" | "olay" |
 // "olay-kalabalik" | "olay-hava" | "olay-arac:<ad>". a: hedeften kameraya yatay açı (iş yeri ve olayda binanın/olayın
 // önüne göre), D: yatay uzaklık, H: kameranın hedef zeminine göre yüksekliği (temel kadraj; her hareket kendi ölçüsünü
 // bundan türetir). yon: ±1 (yan kayma, dönüş, whip yönü; vertigo'da -1 = içeri). Türler:
@@ -145,16 +147,34 @@ function HAREKET({ h, sure, olayBek }) {
     const o = (b.d ?? 10) / 2 + 3;
     return { building: b, door: [b.x + o * Math.sin(b.rot ?? 0), b.z + o * Math.cos(b.rot ?? 0)] };
   };
-  // Driftwood: Town Green [0, 0], iskele ortası (feribot yanında), kilise, ilk ev (yorunge kütüphanesiyle aynı noktalar).
+  // Wattenoog: Marktplatz [0, 0] (Marktbrunnen), iskele ortası (feribot yanında), kilise, ilk ev ve adlı yerler
+  // (yorunge kütüphanesiyle aynı noktalar; yerXZ aşağıdaki yorunge yolunda da aynen var: sayfaya ayrı ayrı gider).
   const MEYDAN = [0, 0], PX = (W.ferryPier.x0 + W.ferryPier.x1) / 2;
   const nokta = (xz, yk) => [xz[0], yerY(xz[0], xz[1]) + yk, xz[1]];
+  const yerXZ = (ad) => {
+    const f = (t, k) => W.features.find((x) => x.type === t && (!k || x[k]));
+    if (ad === "kilise") { const b = W.workplaces?.cami?.[0]?.building ?? W.buildings.find((x) => x.kind === "cami"); return b ? [b.x, b.z] : [-84, -5]; }
+    if (ad === "bayrak") { const g = f("gonder", "ada"); return g ? [g.x, g.z] : null; }
+    if (ad === "watt") return [-900, 860]; // limanın batısında, kıyıdan ~70 m Watt düzlüğü (Priel'ler x −645 ve −1400 civarı)
+    if (ad === "strand") {
+      const k = W.beach?.koerbe;
+      if (k?.length) return [k.reduce((a, c) => a + c.x, 0) / k.length, k.reduce((a, c) => a + c.z, 0) / k.length];
+      const l = W.labels.find((x) => x.text === "Hauptstrand");
+      return l ? [l.x, l.z] : [0, -1590];
+    }
+    if (ad === "muehle") { const m = f("windmuehle"); return m ? [m.x, m.z] : [2140, -300]; }
+    if (ad === "wasserturm") { const m = f("wasserturm"); return m ? [m.x, m.z] : [-560, -1060]; }
+    return null;
+  };
   let Tn = null, oneri = null, pay = 1.2, hareketli = null, yOfs = h.bak ?? 0, tur = h.tur, dMin = 0, tam = false, dTaban = 0;
-  const hd = h.hedef;
+  let hd = h.hedef;
+  // Ada bayrağı direği Rathaus'la gelir (100. sakin): yokken açılış feneri alttan (kırmızı-beyaz, gökyüzü önünde).
+  if (hd === "bayrak" && !yerXZ("bayrak")) { uyar("ada bayrağı direği yok (Rathaus açılmadı): bayrak yerine fener"); hd = "fener"; h = { ...h, D: Math.max(h.D ?? 0, 26), H: 2.2, bak: 18 }; yOfs = 18; }
   if (Array.isArray(hd)) Tn = hd.length === 3 ? [...hd] : nokta(hd, h.bak ?? 2);
   else if (hd === "meydan") Tn = nokta(MEYDAN, h.bak ?? 2);
   else if (hd === "iskele") Tn = nokta([PX, W.ferryPier.z0 + 45], h.bak ?? 2);
   else if (hd === "fener") Tn = nokta([W.fener.x, W.fener.z], h.bak ?? 4);
-  else if (hd === "kilise") Tn = nokta([0, -84], h.bak ?? 9);
+  else if (["kilise", "bayrak", "watt", "strand", "muehle", "wasserturm"].includes(hd)) Tn = nokta(yerXZ(hd), h.bak ?? { kilise: 9, bayrak: 11, watt: 0.5, strand: 1, muehle: 10, wasserturm: 18 }[hd]);
   else if (hd === "ilkev") { const ev = W.homeOf?.(0); Tn = nokta(ev ? [ev.bx, ev.bz] : MEYDAN, h.bak ?? 3); }
   else if (hd === "siradaki") Tn = nokta(W.nextStage?.at ?? MEYDAN, h.bak ?? 2);
   else if (hd?.startsWith?.("isyeri:")) {
@@ -171,15 +191,15 @@ function HAREKET({ h, sure, olayBek }) {
     const odak = O?.plan ? O.odak : null;
     const havaOlay = O?.plan?.tur === "sis" || O?.plan?.tur === "firtina";
     if (havaOlay && hd === "olay-yakin") {
-      // Fırtına/sis yakın (Driftwood): iskelenin üstünde, göz hizasında denize doğru yürüyen bakış; feribot sağda, iskele
+      // Fırtına/sis yakın: iskelenin üstünde, göz hizasında denize doğru yürüyen bakış; feribot sağda, iskele
       // sise/yağmura karışır (çardak yakın çekimi geniş çekimle aynı yeri gösteriyordu).
       Tn = nokta([PX, W.ferryPier.z0 + 40], 2); oneri = Math.PI; yOfs = 0; h = { ...h, goz: 3.3 };
     } else if (havaOlay && hd === "olay-kalabalik") {
-      // Seyirci yok: Town Green'e karşı yandan (kuzeyden), alçak ve geniş; geniş olay çekimi güneyden. (Denenenler: ilk evin
-      // sokağı: karşı evler kamerayı evin dibine itti; kilise 50. sakinde açılıyor; iskeleden kasaba: boş çimen.)
+      // Seyirci yok: Marktplatz'a karşı yandan (kuzeyden), alçak ve geniş; geniş olay çekimi güneyden. (Driftwood'da
+      // denenenler: ilk evin sokağı kamerayı evin dibine itti; kilise 50. sakinde açılıyor; iskeleden kasaba boş.)
       Tn = nokta(odak ?? MEYDAN, 3); oneri = Math.PI + 0.4; yOfs = 0; dTaban = 30; pay = 8; h = { ...h, D: 40, H: 7 };
     } else if (hd === "olay-hava" && O?.plan?.tur === "sis") {
-      // Sis (Driftwood): denizden limana ve iskeleye bakış; feribot ve kıyı sisin içinden seçilir (açık denize bakış
+      // Sis: denizden limana ve iskeleye bakış; feribot ve kıyı sisin içinden seçilir (açık denize bakış
       // düz griydi).
       // Kamera iskelenin doğusunda denizde (feribot iskelenin doğu yanına yanaşır: kamera ile iskele arasında).
       Tn = nokta([PX + 6, W.ferryPier.z0 + 64], 3); oneri = 0.95; yOfs = 0;
@@ -234,8 +254,8 @@ function HAREKET({ h, sure, olayBek }) {
       }
     }
   }
-  // Fırtına/sis odağı Town Green'in çardağı (yarıçap ~7 m): yakından dikey kadrajı doldurup "içerideymiş" gibi görünüyordu;
-  // çardağın kendisi engel sayılmasın (sokak düzeyinde kamera ona yapışıyordu).
+  // Fırtına/sis odağı meydan (Driftwood'da çardak, yarıçap ~7 m: yakından dikey kadrajı dolduruyordu; Wattenoog'da
+  // Marktbrunnen alçak ama aynı pay korunur): odaktaki yapı engel sayılmasın (sokak düzeyinde kamera ona yapışıyordu).
   if ((hd === "olay" || hd === "olay-tele") && (O?.plan?.tur === "sis" || O?.plan?.tur === "firtina")) {
     pay = Math.max(pay, 8); dTaban = Math.max(dTaban, 26); // dikey kadrajda çardak (14 m) ~30 m'den okunur
   }
@@ -607,7 +627,7 @@ for (const [ci, shot] of S.cekimler.entries()) {
     if (r.yok) console.log(`  UYARI çekim ${ci + 1}: olay anı hizalanamadı (${r.yok})`);
     else console.log(`  çekim ${ci + 1}: ${shot.anAni.tur} ${yaz(r.s)} → çekimin ${shot.anAni.t} sn'sine (sayfa ${yaz(r.m)} → ${yaz(r.son)})`);
   }
-  // Hareket kurulamazsa (sayfa API'si eksik vb.) çekim düşmez: Town Green'in geniş açısına yavaş yörünge (UYARI).
+  // Hareket kurulamazsa (sayfa API'si eksik vb.) çekim düşmez: Marktplatz'ın geniş açısına yavaş yörünge (UYARI).
   if (shot.hareket) await page.evaluate(HAREKET, { h: shot.hareket, sure: shot.sure, olayBek: shot.olayBek ?? null }).catch(async (e) => {
     console.log(`  UYARI çekim ${ci + 1}: hareket kurulamadı (${e.message.split("\n")[0]}): meydan yörüngesi`);
     await page.evaluate(HAREKET, { h: { tur: "yorunge", hedef: "meydan", a: 0.45, D: 46, H: 20 }, sure: shot.sure, olayBek: null });
@@ -729,12 +749,34 @@ for (const [ci, shot] of S.cekimler.entries()) {
       return;
     }
     if (yorunge) {
-      const W = A.world, h = yorunge.hedef;
+      const W = A.world;
+      let h = yorunge.hedef;
       const px = (W.ferryPier.x0 + W.ferryPier.x1) / 2;
+      // Adlı yerler (HAREKET'teki yerXZ ile aynı; sayfaya ayrı gittiği için burada yeniden).
+      const f = (t, k) => W.features.find((x) => x.type === t && (!k || x[k]));
+      const yerXZ = (ad) => {
+        if (ad === "kilise") { const b = W.workplaces?.cami?.[0]?.building ?? W.buildings.find((x) => x.kind === "cami"); return b ? [b.x, b.z] : [-84, -5]; }
+        if (ad === "bayrak") { const g = f("gonder", "ada"); return g ? [g.x, g.z] : null; }
+        if (ad === "watt") return [-900, 860];
+        if (ad === "strand") {
+          const k = W.beach?.koerbe;
+          if (k?.length) return [k.reduce((a, c) => a + c.x, 0) / k.length, k.reduce((a, c) => a + c.z, 0) / k.length];
+          const l = W.labels.find((x) => x.text === "Hauptstrand");
+          return l ? [l.x, l.z] : [0, -1590];
+        }
+        if (ad === "muehle") { const m = f("windmuehle"); return m ? [m.x, m.z] : [2140, -300]; }
+        if (ad === "wasserturm") { const m = f("wasserturm"); return m ? [m.x, m.z] : [-560, -1060]; }
+        return null;
+      };
+      // Ada bayrağı direği yoksa (Rathaus 100. sakinde) açılış feneri alttan: yakın yörünge kuleye girmesin diye ≥26 m.
+      if (h === "bayrak" && !yerXZ("bayrak")) {
+        (globalThis.__uyarilar ??= []).push("ada bayrağı direği yok (Rathaus açılmadı): bayrak yerine fener");
+        h = "fener"; yorunge.r = Math.max(yorunge.r, 26); yorunge.r1 = yorunge.r1 ? Math.max(yorunge.r1, 26) : undefined; yorunge.h = 2.2; yorunge.bak = 18;
+      }
       const ev = h === "ilkev" ? W.homeOf(0) : null;
       const at = h === "siradaki" ? W.nextStage?.at : h === "iskele" ? [px, W.ferryPier.z0 + 45] : h === "fener" ? [W.fener.x, W.fener.z]
-        : h === "meydan" ? [0, 0] : h === "kilise" ? [0, -84] : ev ? [ev.bx, ev.bz] : h;
-      const [x, z] = at ?? [0, 0];
+        : h === "meydan" ? [0, 0] : typeof h === "string" && yerXZ(h) ? yerXZ(h) : ev ? [ev.bx, ev.bz] : h;
+      const [x, z] = Array.isArray(at) ? at : [0, 0];
       const gy = Math.max(0, W.groundY(x, z));
       const ease = (u) => u * u * (3 - 2 * u);
       globalThis.__yonetmen = () => {

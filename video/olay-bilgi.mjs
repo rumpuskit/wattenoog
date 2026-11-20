@@ -2,7 +2,9 @@
 // Otomatik üretim (social-management mac/ada/uret.sh) gözetimsiz Claude'dan önce çalıştırır, sonucu isteme yazar:
 // videodaki sayılar sitedeki olayla birebir aynı olsun.
 //   node olay-bilgi.mjs [--yuva ogle|aksam] [--olay kaza --olaysaat 08:33] [--port 4196]  → stdout JSON ya da {"olay": null}
-//   --yuva aksam: öğleden sonra olayı (23:30 videosu; 17 Kasım akşamı, günde iki olay).
+//   --yuva aksam: öğleden sonra olayı (Wattenoog'da 20:00 videosu; yuva ogle = 13:30, sabah olayı). Saatler Berlin
+//   (sim.js; ada saati = kullanıcının saati). Çıktıdaki "de" (Almanca olay adı) olay planında varsa dolar, yoksa null;
+//   "en" geriye uyum için kalır. Olay mantığına dokunulmaz (üç adalı plan ortak, DEVIR §7).
 // Siteyi derler (vite build) ve kendi önizleme sunucusunu açar (port 4196; üretimin 4199'u ile çakışmaz).
 import { chromium } from "playwright-core";
 import { execFileSync, spawn } from "node:child_process";
@@ -69,7 +71,7 @@ for (let t = P.bas; t <= P.son + 30; t += 0.05) {
   if (e && !evreler[e.ad]) evreler[e.ad] = saatSn(t);
 }
 console.log(JSON.stringify({
-  olay: P.tur, ad: P.ad, en: P.en, bas: saat(P.bas), son: saat(P.son), bitti: dakika >= P.son,
+  olay: P.tur, ad: P.ad, de: P.de ?? null, en: P.en, bas: saat(P.bas), son: saat(P.son), bitti: dakika >= P.son,
   evreler, yerAdi: sonuc?.yerAdi ?? null, seyirci: sonuc?.seyirci ?? null, metin: sonuc?.yazi?.uzun ?? null,
   araclar: sonuc?.zaman ? JSON.parse(JSON.stringify(sonuc.zaman, (k, v) => (typeof v === "number" ? saatSn(v) : v))) : null,
   sayfaPlani: sonuc?.plan?.tur === plan.tur && sonuc?.plan?.bas === plan.bas, gun: day, yuva,

@@ -23,6 +23,7 @@ function terrainColor(world, x, z, h, ny) {
   }
   // Tuzlu bataklık (setin önü, +0,6 … +0,95): zeytin yeşili, kıyıya doğru koyulaşan, ince kanallı.
   if (south && h < 1.0 && world.zoneAt?.(x, z) === "deich") return tmp.copy(MARSH).lerp(MARSH_DRY, Math.min(1, Math.max(0, fbm(x / 20, z / 20, 29) + 0.5)));
+  if (!south && world.isBeach?.(x, z)) return tmp.copy(P.SAND);
   const coastal = d > world.margin(x, z) - 30;
   if (coastal && h < 1.0) return tmp.copy(P.SAND); // tesviye omzu (FLAT_Y − 0,12) çimen kalır
   if (ny < 0.62) return tmp.copy(P.ROCK);

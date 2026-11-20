@@ -868,14 +868,15 @@ const MODELS = {
     head: merged([box(0.32, 0.12, 0.06, -0.6, 0.72, 2.16, "#fff6d8"), box(0.32, 0.12, 0.06, 0.6, 0.72, 2.16, "#fff6d8")]),
     tail: merged([box(0.32, 0.12, 0.06, -0.6, 0.72, -2.16, "#d8302c"), box(0.32, 0.12, 0.06, 0.6, 0.72, -2.16, "#d8302c")]),
   }),
-  // Pikap: yüksek kabin, açık kasa (Amerikan kasabasında arabaların üçte biri).
+  // Wattenoog: "pickup" adı korunur (öbür modüller türü adıyla çağırır) ama model kapalı kasa Transporter (Kleinbus /
+  // Handwerker); Amerikan açık kasalı pikabı Alman adasına uymuyordu (20 Kasım). Ön +z, kısa burun.
   pickup: () => ({
-    body: merged([box(1.95, 0.75, 5.5, 0, 0.42, 0), box(1.9, 0.12, 1.6, 0, 1.12, 1.95)]),
-    glass: merged([box(1.78, 0.58, 1.75, 0, 1.18, 0.55, "#3a4a5c")]),
-    roof: merged([box(1.72, 0.08, 1.6, 0, 1.76, 0.45)]),
-    fixed: merged([...wheels(3.4, 1.7, 0.4), box(1.75, 0.5, 2.25, 0, 0.75, -1.45, "#1d1d20"), box(1.97, 0.16, 0.22, 0, 0.42, 2.78, "#b9bcc0"), box(1.97, 0.16, 0.22, 0, 0.42, -2.78, "#2a2a2e")]),
-    head: merged([box(0.34, 0.16, 0.06, -0.62, 0.92, 2.76, "#fff6d8"), box(0.34, 0.16, 0.06, 0.62, 0.92, 2.76, "#fff6d8")]),
-    tail: merged([box(0.16, 0.34, 0.06, -0.88, 0.9, -2.76, "#d8302c"), box(0.16, 0.34, 0.06, 0.88, 0.9, -2.76, "#d8302c")]),
+    body: merged([box(1.95, 0.8, 4.9, 0, 0.4, 0), box(1.95, 0.86, 3.75, 0, 1.2, -0.57), box(1.95, 0.42, 0.66, 0, 1.2, 2.12)]),
+    glass: merged([box(1.9, 0.86, 0.95, 0, 1.2, 1.32, "#3a4a5c"), box(1.97, 0.5, 2.6, 0, 1.36, -0.95, "#3a4a5c")]),
+    roof: merged([box(1.93, 0.1, 4.7, 0, 2.06, -0.08)]),
+    fixed: merged([...wheels(3.0, 1.7, 0.36), box(1.97, 0.18, 0.2, 0, 0.36, 2.48, "#2a2a2e"), box(1.97, 0.18, 0.2, 0, 0.36, -2.48, "#2a2a2e"), box(0.08, 0.08, 0.2, 0.99, 1.45, 1.75, "#2a2a2e"), box(0.08, 0.08, 0.2, -0.99, 1.45, 1.75, "#2a2a2e")]),
+    head: merged([box(0.32, 0.16, 0.06, -0.66, 0.85, 2.47, "#fff6d8"), box(0.32, 0.16, 0.06, 0.66, 0.85, 2.47, "#fff6d8")]),
+    tail: merged([box(0.16, 0.42, 0.06, -0.86, 0.95, -2.47, "#d8302c"), box(0.16, 0.42, 0.06, 0.86, 0.95, -2.47, "#d8302c")]),
   }),
   bus: () => ({
     body: merged([box(2.5, 2.55, 12, 0, 0.4, 0)]),
@@ -998,8 +999,8 @@ export class Vehicles {
   }
 
   addCar(x, y, z, heading, colorIndex, opts = {}) {
-    // Aynı renk sırası hep aynı araç: üçte biri pikap.
-    const type = !opts.taxi && colorIndex % 3 === 1 ? "pickup" : "car";
+    // Aynı renk sırası hep aynı araç: dörtte biri Transporter (model adı "pickup").
+    const type = !opts.taxi && colorIndex % 4 === 1 ? "pickup" : "car";
     this.add(type, x, y, z, heading, { ...opts, color: opts.taxi ? TAXI_COLOR : CAR_COLORS[colorIndex % CAR_COLORS.length] });
   }
 

@@ -405,12 +405,15 @@ export function brickPaving() {
 export function klinkerPaving() {
   return (cache.klinkerPaving ??= canvasTexture(256, (ctx, sz) => {
     const rand = rng("klinker-doseme");
-    ctx.fillStyle = "#6d625c";
+    // 20 Kasım: koyu derz + koyu tuğla uzaktan çamur/malç gibi okunuyordu (açılış videosu). Kuzey Alman klinkeri güneşte
+    // açık kırmızı; derz kum rengi, arada koyu (mor-kahve) tuğlalar (Bunt-Klinker).
+    ctx.fillStyle = "#b8a996";
     ctx.fillRect(0, 0, sz, sz);
     const u = sz / 16; // tuğla 2u × u
     const brick = (x, y, w, h) => {
-      const v = rand(), t = rand();
-      const r = 118 + Math.floor(v * 34), g = 70 + Math.floor(v * 20 + t * 10), b = 58 + Math.floor(v * 14);
+      const v = rand(), t = rand(), koyu = rand() < 0.16;
+      const r = koyu ? 112 + Math.floor(v * 20) : 166 + Math.floor(v * 30), g = koyu ? 66 + Math.floor(v * 12) : 92 + Math.floor(v * 22 + t * 10),
+        b = koyu ? 62 + Math.floor(v * 12) : 72 + Math.floor(v * 16);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
     };

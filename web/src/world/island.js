@@ -371,7 +371,12 @@ export function setFlatAreas(rects) {
     }
     return d;
   };
-  for (const r of rects) {
+  for (const r0 of rects) {
+    // 20 Kasım: inside() iç tarafa + verir yalnız bir yönde; layout.js box() öbür yönde veriyordu ve düzleştirme HİÇBİR
+    // yerde uygulanmıyordu (Kurhaus kumula gömülüydü). Yön işaretli alandan bulunur, gerekirse çevrilir.
+    let alan = 0;
+    for (let i = 0; i < r0.poly.length; i++) { const [ax, az] = r0.poly[i], [bx, bz] = r0.poly[(i + 1) % r0.poly.length]; alan += ax * bz - bx * az; }
+    const r = alan < 0 ? { poly: [...r0.poly].reverse() } : r0;
     const xs = r.poly.map((q) => q[0]), zs = r.poly.map((q) => q[1]);
     const i0 = clamp(Math.floor((Math.min(...xs) - 40 - X0) / S), 0, NX - 1), i1 = clamp(Math.ceil((Math.max(...xs) + 40 - X0) / S), 0, NX - 1);
     const j0 = clamp(Math.floor((Math.min(...zs) - 40 - Z0) / S), 0, NZ - 1), j1 = clamp(Math.ceil((Math.max(...zs) + 40 - Z0) / S), 0, NZ - 1);

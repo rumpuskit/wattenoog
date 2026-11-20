@@ -111,7 +111,7 @@ const kesimler = [
   // 5: ilk adres, ilk sakin gelince dikilen Friesenhaus (önizleme: nufus=1).
   [bas(5) - 0.15, { adres: "saat=10:20&hiz=4&nufus=1", kamera: ilkEv, yazilar: (s) => pill(ilkAdres, ilkMahalle, s) }],
   // 6: montaj başı, 5 sakin: Marktplatz'ın Klönbänke ve ıhlamurları.
-  [bas(6) - 0.15, { adres: "saat=10:40&hiz=4&nufus=5", isinma: 40, kamera: (s) => [[0, 46, 24, 58, 0, 2, 0], [s, 36, 20, 50, 0, 2, 0]],
+  [bas(6) - 0.15, { adres: "saat=10:40&hiz=4&nufus=5", isinma: 40, kamera: (s) => [[0, 3, 23, 66, 0, 2, -4], [s, 2, 19, 56, 0, 2, -4]], // güneyden x=0: ıhlamur sıraları (±18, ±36) arasından
     yazilar: () => montaj(5, "Marktplatz") }],
   // 7: kelimelere oturan kesmeler: Fischbude, Bäckerei, Kirche, Kurhaus (gelişim eşiklerinde, kendi düzeylerinde).
   ...MONTAJ.map((m, i) => [kelime(7, i * 2) - 0.1, { adres: `saat=${["11:20", "11:40", "12:10", "15:50"][i]}&hiz=4&nufus=${m.nufus}`, isinma: 40,

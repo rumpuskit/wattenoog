@@ -60,7 +60,7 @@ const STYLES = {
   firin: { w: 10, d: 12, floors: 2, roof: "gable", wall: "#efe9dc", roofColor: "#8e3b2a", shop: true, awning: "#8e2f2a", giebel: true },
   kafe: { w: 10, d: 12, floors: 2, roof: "gable", wall: "#f4f1ea", roofColor: "#3c3f45", shop: true, awning: "#2f4256", giebel: true },
   atolye: { w: 14, d: 12, floors: 1, roof: "gable", wall: "#e8e1cf", roofColor: "#3c3f45", shop: true, awning: "#6f7d4a", giebel: true },
-  kahvehane: { w: 8, d: 5, floors: 1, roof: "flat", wall: "#2f5d8a", roofColor: "#e9e4da", shop: true, awning: "#f4f1ea", stripes: "#2f5d8a", kiosk: true },
+  kahvehane: { w: 8, d: 5, floors: 1, roof: "flat", wall: "#2f5d8a", roofColor: "#e9e4da", shop: true, awning: "#f4f1ea", stripes: "#2f5d8a", kiosk: true, signFg: "#1f3f6a" }, // beyaz tente: koyu yazı (20 Kasım: tabela boş görünüyordu)
   karakol: { w: 20, d: 13, floors: 2, roof: "flat", wall: "#f2f2ee", roofColor: "#c9c4bb", band: "#1f3f8f", plate: "#1f3f8f", flag: true },
   adliye: { w: 26, d: 17, floors: 2, roof: "hip", wall: "#8e3a2c", roofColor: "#3c3f45", brick: true, plate: "#5a4636", flag: true },
   muhtarlik: { w: 14, d: 9, floors: 1, roof: "gable", wall: "#a2452f", roofColor: "#3c3f45", brick: true, plate: "#2f5d8a", flag: true },
@@ -223,9 +223,10 @@ export class World {
     const R = I.RESERVES, box = (b) => ({ poly: [[b.x0, b.z0], [b.x0, b.z1], [b.x1, b.z1], [b.x1, b.z0]] });
     const pz = I.promenadeZ;
     I.setFlatAreas([
-      box({ x0: -440, x1: 480, z0: -570, z1: 640 }), box({ x0: -340, x1: 440, z0: 540, z1: 800 }),
+      box({ x0: -440, x1: 480, z0: -570, z1: 640 }), box({ x0: -340, x1: 600, z0: 540, z1: 800 }),
       box({ x0: -60, x1: 60, z0: -1520, z1: -560 }), // Strandstraße'nin Kurviertel kısmı
-      { poly: [[-700, pz(-700) - 12], [-700, pz(-700) + 90], [620, pz(620) + 90], [620, pz(620) - 12]] }, // Promenade, Kurhaus, otel
+      // Promenade, Kurhaus, otel: kıyının kavisini izleyen 110 m'lik parçalar (tek dörtgen ortada promenadı 20 m dışarıda bırakıyordu).
+      ...Array.from({ length: 12 }, (_, i) => { const a = -700 + i * 110, b = a + 110; return { poly: [[a, pz(a) - 12], [a, pz(a) + 90], [b, pz(b) + 90], [b, pz(b) - 12]] }; }),
       box({ x0: 2000, x1: 2700, z0: -300, z1: 380 }), // polder
       box({ x0: -2940, x1: -2855, z0: -470, z1: -385 }), // Leuchtturm-Hof (bekçi evi, kafe)
       ...this.zones.map((z) => ({ poly: [[-z.hw, -12], [-z.hw, I.ZONE.depth], [z.hw, I.ZONE.depth], [z.hw, -12]].map(([u, v]) => I.zoneToWorld(z, u, v)) })),
@@ -273,7 +274,14 @@ export class World {
   /** Kumul kuşağı mı (dış kıyının 55–340 m içi; arazi rengi ve ağaç seyrekliği için)? */
   isDune(x, z) {
     const dn = z - I.northShoreZ(x);
-    return dn > 50 && dn < 340 && this.zoneAt(x, z) !== "mahalle";
+    // Düzlenmiş alanlar (Promenade, Kurviertel) kumul değil, çim (20 Kasım: düzleştirme düzelince kumda ağaç kalıyordu).
+    return dn > 50 && dn < 340 && this.zoneAt(x, z) !== "mahalle" && I.flatness(x, z) < 0.5;
+  }
+
+  /** Kuzey kumsalı (kıyıdan 50 m'ye dek, kumulların önü): kum rengi (eskiden h > 1 m'de çim şeridi çıkıyordu). */
+  isBeach(x, z) {
+    const dn = z - I.northShoreZ(x);
+    return dn > -8 && dn <= 52 && I.flatness(x, z) < 0.5;
   }
 
   /** Bir noktanın yer türü: merkez (kasaba), mahalle, tepe (Bluff Head), kumul, kir. */
@@ -943,7 +951,7 @@ export class World {
           fillers.push([Math.hypot(a[0], a[1]), this.addBuilding({
             kind: "carsi", x: q.x, z: q.z, rot: q.rot, w, d, floors: 2 + Math.floor(hash2(kk, 3, 9) * 2), roofType: "gable",
             address: no(fr, s + w / 2, side), wall, roof: hash2(kk, 4, 9) < 0.5 ? "#3c3f45" : "#8e3b2a",
-            style: { shop: true, awning, brick, giebel: true, stufen: brick && hash2(kk, 8, 9) < 0.35 }, workplace: true,
+            style: { shop: true, awning, brick, giebel: true, stufen: brick && hash2(kk, 8, 9) < 0.35, ...(awning === "#c9a441" ? { signFg: "#2b2420" } : {}) }, workplace: true,
           })]);
           s += w;
         }

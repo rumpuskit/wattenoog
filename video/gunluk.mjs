@@ -617,8 +617,8 @@ const OLAY_ANI = {
   // --- ajan D --- balon: kalkış hepsi birden, iniş "olay:inis+4" / söndü "olay:yerde+3"; uçurtma: takılma "olay:takildi+2".
   balon: { olay: "olay:kalkis+2", "olay-yakin": "olay:sisirme+9", "olay-kalabalik": "olay:sisirme+10", "olay-tele": "olay:suzulme+8", "olay-hava": "olay:suzulme+4" },
   ucurtma: { olay: "olay:senlik+5", "olay-yakin": "olay:takildi+3", "olay-kalabalik": "olay:senlik+8", "olay-tele": "olay:senlik+2", "olay-hava": "olay:senlik+10" },
-  // kus = bald eagle: the dive is exactly 2.45 min into "dalis" (splash +5 s); perched in the tree during "agacta".
-  kus: { olay: "olay:dalis+2.42", "olay-yakin": "olay:agacta+3", "olay-kalabalik": "olay:dalis+2.3", "olay-tele": "olay:gorundu+3", "olay-hava": "olay:dalis+2.47" },
+  // kus = Ringelgänse (olay-ayar.js KUS.evre: gelis → inis → otlama → gidis): sürü Watt üstünde döner, Salzwiese'ye iner, otlar.
+  kus: { olay: "olay:inis+1", "olay-yakin": "olay:otlama+4", "olay-kalabalik": "olay:otlama+6", "olay-tele": "olay:gelis+3", "olay-hava": "olay:inis+0.4" },
   // moose: "kasabada" middle = browsing at the end of the walk, watchers there; +3/+6 = walking in along the paths/Main Street.
   moose: { olay: "olay:kasabada", "olay-yakin": "olay:kasabada+6", "olay-kalabalik": "olay:kasabada", "olay-tele": "olay:gorundu+3", "olay-hava": "olay:kasabada+3" },
   // --- ajan D sonu ---

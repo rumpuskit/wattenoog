@@ -1417,7 +1417,8 @@ function buildFeatures(world) {
         // Balkon: konsollar, döşeme, korkuluk.
         for (let k = 0; k < 12; k++) {
           const a = (k / 12) * Math.PI * 2;
-          const c = put(new THREE.BoxGeometry(0.2, 0.6, 0.6), std("#f7f5f0"), Math.sin(a) * (r1 + 0.3), H - 0.35, Math.cos(a) * (r1 + 0.3), false);
+          // Kuzey Denizi feneri: konsollar galeriyle aynı koyu demir (beyazı kırmızı bantta kopuk kutu gibi okunuyordu).
+          const c = put(new THREE.BoxGeometry(0.2, 0.6, 0.6), f.de ? metal : std("#f7f5f0"), Math.sin(a) * (r1 + 0.3), H - 0.35, Math.cos(a) * (r1 + 0.3), false);
           c.rotation.y = a;
         }
         put(new THREE.CylinderGeometry(r1 + 0.85, r1 + 0.85, 0.22, 24), metal, 0, H + 0.08, 0);

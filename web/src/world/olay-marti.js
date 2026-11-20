@@ -10,7 +10,12 @@ import { roll } from "../sim.js";
 import { resetPose } from "./people.js";
 import { kesir } from "./olay-plan.js";
 import { gorunum, tavirPoz, boya, birlestir, malzeme, clamp01, ease, aci, fark, lerp } from "./olay-yardim.js";
+import { fischbroetchenGeo } from "./olay-tekne.js";
+import { tide } from "./gelgit.js";
 
+// Wattenoog (Almanca): Möwe klaut Fischbrötchen am Fähranleger. Martının gagasındaki Fischbrötchen kendi modeli (ekmek, ringa,
+// soğan, marul); sakinin elindeki eşya human.js'te "fischbrot". Suya konan martılar gelgitle iner/çıkar.
+const DE = DIL === "de";
 // Evreler (olay-plan.js marti ile aynı): simit 0–0.3, kapma 0.3–0.36, kovalama 0.36–0.8, dagilma 0.8–1.
 const EK = 0.3, EKO = 0.36, ED = 0.8;
 const N = 6; // martı
@@ -37,7 +42,7 @@ export function buildMartiOlay({ world, group }) {
     ]);
     const kanat = (s) => birlestir([boya(new THREE.BoxGeometry(0.62, 0.025, 0.26).translate(s * 0.31, 0.03, 0), "#a7aeb5"), boya(new THREE.BoxGeometry(0.2, 0.026, 0.2).translate(s * 0.72, 0.03, -0.02), "#202024")]);
     const mk = (geo) => { const m = new THREE.InstancedMesh(geo, mat, N); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.castShadow = true; g.add(m); return m; };
-    const simit = new THREE.Mesh(birlestir(DIL === "en"
+    const simit = DE ? new THREE.Mesh(fischbroetchenGeo(), mat) : new THREE.Mesh(birlestir(DIL === "en"
       ? [boya(new THREE.CapsuleGeometry(0.03, 0.14, 3, 8).rotateZ(Math.PI / 2), "#e3b46a"), boya(new THREE.CapsuleGeometry(0.019, 0.16, 3, 8).rotateZ(Math.PI / 2).translate(0, 0.02, 0), "#b4442c")]
       : [boya(new THREE.TorusGeometry(0.07, 0.022, 6, 14).rotateX(Math.PI / 2), "#b8752f")]), mat);
     g.add(simit);
@@ -70,7 +75,7 @@ export function buildMartiOlay({ world, group }) {
     K.TL = (o.bas + 0.66 * sure - Tg) * 60; // kapıştan konmaya (sn)
     gorsel();
     const yon = aci(-boy[0] * 1.0 - out[0] * 0.3, -boy[1] * 1.0 - out[1] * 0.3);
-    return { odak: [x, z], odakY: 1.6, kalabalik: [x + boy[0] * 5 - out[0] * 2.5, z + boy[1] * 5 - out[1] * 2.5], kiyi: null, yon, yerAdi: DIL === "en" ? "the pier" : "vapur iskelesi", zaman: null, gitD: 24, gitEgim: 0.42, cekimOlcek: 0.55, cekimOlcekH: 0.5 };
+    return { odak: [x, z], odakY: 1.6, kalabalik: [x + boy[0] * 5 - out[0] * 2.5, z + boy[1] * 5 - out[1] * 2.5], kiyi: null, yon, yerAdi: DIL === "en" ? "the pier" : DE ? "Fähranleger" : "vapur iskelesi", zaman: null, gitD: 24, gitEgim: 0.42, cekimOlcek: 0.55, cekimOlcekH: 0.5 };
   }
 
   // ------------------------------------------------ uçuş
@@ -172,7 +177,8 @@ export function buildMartiOlay({ world, group }) {
       E.set(pitch, hz, roll_);
       Q.setFromEuler(E);
       const s = 1.15;
-      M4.compose(V.set(m0[0], m0[1], m0[2]), Q, S0.set(s, s, s));
+      const sy = DE && m0[1] < 1.5 ? tide() * (1 - m0[1] / 1.5) : 0; // suya yakın martı gelgit seviyesini izler
+      M4.compose(V.set(m0[0], m0[1] + sy, m0[2]), Q, S0.set(s, s, s));
       G.govde.setMatrixAt(k, M4);
       // Kanat: uçarken çırpar (süzülürken ara ara), dalışta geride, konmuş/yüzerken katlı.
       let kan = 0, ac = 1;
@@ -190,7 +196,7 @@ export function buildMartiOlay({ world, group }) {
         G.simit.visible = t >= 0;
         if (t >= 0) {
           const ileri = kip === "yuzer" ? 0.45 : 0.62;
-          G.simit.position.set(m0[0] + Math.sin(hz) * ileri * s, m0[1] + (kip === "yuzer" ? -0.03 : 0.04) * s, m0[2] + Math.cos(hz) * ileri * s);
+          G.simit.position.set(m0[0] + Math.sin(hz) * ileri * s, m0[1] + sy + (kip === "yuzer" ? -0.03 : 0.04) * s, m0[2] + Math.cos(hz) * ileri * s);
           G.simit.rotation.set(0, hz, 0);
         }
       }
@@ -224,7 +230,7 @@ export function buildMartiOlay({ world, group }) {
 
   /** Kurbanın duruşu (t: kapıştan sn): yer, uzatır, kapışta irkilir, martıyı gösterir, güler. */
   function kurbanPoz(p, tk, t, ph, idle) {
-    const yiyecek = DIL === "en" ? "sosisli" : "simit";
+    const yiyecek = DE ? "fischbrot" : DIL === "en" ? "sosisli" : "simit";
     const G0 = marti(0, tk, a3), bak = fark(aci(G0[0] - p.x, G0[2] - p.z) - p.heading);
     if (tk < -DALIS - 6) {
       // Yer: ara ara ağzına götürür (9 sn'de bir), arada elinde tutar; martılara bakar.
@@ -274,7 +280,7 @@ export function buildMartiOlay({ world, group }) {
     // kurbanın arkasından dalar). Sonra simitli martı.
     if (t < 5) return [K.V[0] + K.out[0] * 0.4, K.y0 + 1.5, K.V[1] + K.out[1] * 0.4];
     const g = marti(0, t, [0, 0, 0]);
-    return [g[0], g[1], g[2]];
+    return [g[0], g[1] + (DE && g[1] < 1.5 ? tide() * (1 - g[1] / 1.5) : 0), g[2]];
   }
   function anlik(o, m) {
     if (!K || K.o !== o) return null;
@@ -295,6 +301,15 @@ export function buildMartiOlay({ world, group }) {
     if (!K) return null;
     const t = (minute - K.Tg) * 60, sey = S.seyirci, en = DIL === "en";
     const sakin = K.kurban != null;
+    if (DE) {
+      const kim = sakin ? "jemand von der Insel" : "ein Tagesgast", wem = sakin ? "jemandem von der Insel" : "einem Tagesgast";
+      const lacht = sey ? (sey === 1 ? " Eine Person am Anleger lacht laut los." : ` ${sey} Leute am Anleger lachen laut los.`) : "";
+      const lachte = sey ? (sey === 1 ? " Eine Person am Anleger musste lachen." : ` ${sey} Leute am Anleger mussten lachen.`) : "";
+      if (t < 0) return { kisa: "Möwen kreisen über dem Fähranleger", uzun: `Am Fähranleger isst ${kim} am Geländer ein Fischbrötchen; sechs Möwen kreisen darüber, zwei haben sich schon daneben niedergelassen.` };
+      if (t < K.TL + 5) return { kisa: "Möwe klaut Fischbrötchen!", uzun: `Um ${saatYaz(K.Tg)} stieß am Fähranleger eine Möwe herab, schnappte ${wem} das Fischbrötchen aus der Hand und flog damit übers Hafenbecken davon; fünf Möwen jagen hinterher.${lacht}` };
+      if (minute < o.son - 0.4) return { kisa: "Die Möwe ist mit dem Fischbrötchen weg", uzun: `Um ${saatYaz(K.Tg)} schnappte eine Möwe ${wem} am Fähranleger das Fischbrötchen weg, fünf Möwen jagten sie übers Hafenbecken.${lachte} Jetzt sitzt sie mit der Beute auf dem Wasser, die anderen zanken sich um sie herum.` };
+      return { kisa: `Möwe klaut Fischbrötchen am Fähranleger · ${saatYaz(K.Tg)}`, uzun: `Um ${saatYaz(K.Tg)} stieß am Fähranleger eine Möwe herab und schnappte ${wem} das Fischbrötchen aus der Hand; fünf Möwen jagten sie übers Hafenbecken.${lachte} Mit dem Fischbrötchen landete sie auf dem Wasser, die anderen kamen dazu.` };
+    }
     if (en) {
       const kim = sakin ? "a neighbor" : "a visitor";
       if (t < 0) return { kisa: "Seagulls circling the pier", uzun: `On the pier ${kim} is eating a hot dog at the railing; six seagulls are circling overhead and two have landed on the railing.` };

@@ -7,7 +7,10 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { DIL, FOK } from "./olay-ayar.js";
-import { TAU, ss, mix, hr, kiyiYeri, kiyiAdi, iskeleUzak, vapurUzak, govde, levha, boyaLevha, kure, suAlti, kopukHavuzu } from "./olay-kiyi.js";
+import { TAU, ss, mix, hr, kiyiYeri, kiyiAdi, iskeleUzak, vapurUzak, govde, levha, boyaLevha, kure, suAlti, kopukHavuzu, gelgitSeviye, kuruKiyi } from "./olay-kiyi.js";
+// Wattenoog (DIL "de"): Seehunde kaya yerine kıyının önündeki bir kum sırtında (Sandbank) yatar; gelgitle su seviyesi
+// değişir (gelgit.js): yer olayın ortasındaki suya göre seçilir, kum sırtı ve foklar o anki suyla birlikte iner/çıkar.
+const DE = DIL === "de";
 
 // Fok türleri: L boy (m), renkler, benek.
 const TURLER = {
@@ -73,6 +76,29 @@ function kayaGeo(rx, ry, rz, tohum, renk) {
   return ni;
 }
 
+/** Kum sırtı (Wattenoog): basık, düz tepeli, kuru kum üstte, ıslak kum kenarda (yo: tepeye göre). */
+function kumGeo(rx, ry, rz, tohum) {
+  const g = new THREE.IcosahedronGeometry(1, 3); g.deleteAttribute("uv"); g.deleteAttribute("normal");
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const n = 0.92 + 0.12 * Math.sin(x * 2.1 + tohum) * Math.cos(z * 1.7 + tohum * 0.3);
+    x *= n; z *= n;
+    if (y > 0.35) y = 0.35 + (y - 0.35) * 0.12; // geniş düz tepe
+    p.setXYZ(i, x * rx, y * ry, z * rz);
+  }
+  const ni = g.index ? g.toNonIndexed() : g, q = ni.attributes.position, col = [];
+  const KURU = new THREE.Color("#dccb9f"), ISLAK = new THREE.Color("#a99670"), Cc = new THREE.Color();
+  for (let i = 0; i < q.count; i += 3) {
+    const yo = (q.getY(i) + q.getY(i + 1) + q.getY(i + 2)) / 3 / ry, v = 0.94 + 0.08 * hr(tohum, i, 9);
+    Cc.copy(ISLAK).lerp(KURU, ss(0.22, 0.38, yo)).multiplyScalar(v);
+    for (let k = 0; k < 3; k++) col.push(Cc.r, Cc.g, Cc.b);
+  }
+  ni.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  ni.computeVertexNormals();
+  return ni;
+}
+
 export function buildFokOlay({ world, scene, group: olayGrubu }) {
   const AY = FOK ?? { tur: DIL === "en" ? "liman" : "kesis", sayi: DIL === "en" ? 5 : 1 };
   const T = TURLER[AY.tur] ?? TURLER.kesis;
@@ -112,25 +138,28 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
   /** Yer: kıyıdan 9–22 m açıkta 0,7–2,6 m derin, iskeleden/vapur yolundan uzak; gelişi derin sudan. */
   function yerBul(o) {
     let R = null;
+    // Wattenoog: suya göre (olayın ortasındaki gelgit seviyesi hT); kumsalda su çizgisi ~35 m oynadığı için uzaklıklar geniş.
+    const hT = DE ? gelgitSeviye(o.day, (o.bas + o.son) / 2) : 0;
     const yer = kiyiYeri(world, o, {
-      tuz: 1, kaynak: ["sahil_yolu", "kasaba", "iskele"],
+      tuz: 1, kaynak: DE ? ["plaj", "sahil_yolu", "kasaba"] : ["sahil_yolu", "kasaba", "iskele"],
       deniz: (W, e2, e1) => {
-        for (const d of [12, 15, 10, 18, 22]) {
-          const x = W[0] + e2[0] * d, z = W[1] + e2[1] * d, h = world.height(x, z);
+        for (const d of DE ? [18, 24, 30, 36, 44, 52, 60] : [12, 15, 10, 18, 22]) {
+          const x = W[0] + e2[0] * d, z = W[1] + e2[1] * d, h = world.height(x, z) - hT;
           if (h > -0.7 || h < -4.5) continue;
           let ok = true;
-          for (const la of [-6, 0, 6]) for (const ge of [-2, 0, 3]) {
+          for (const la of DE ? [-11, 0, 11] : [-6, 0, 6]) for (const ge of DE ? [-5, 0, 5] : [-2, 0, 3]) {
             const px = x + e1[0] * la + e2[0] * ge, pz = z + e1[1] * la + e2[1] * ge;
-            if (world.height(px, pz) > -0.4 || iskeleUzak(world, px, pz) < 9 || vapurUzak(world, px, pz) < 40) ok = false;
+            if (world.height(px, pz) - hT > -0.4 || iskeleUzak(world, px, pz) < 9 || vapurUzak(world, px, pz) < 40) ok = false;
           }
           if (!ok) continue;
-          if (world.height(W[0] + e2[0] * 70, W[1] + e2[1] * 70) > -3) continue; // geliş yolu derin
+          if (world.height(W[0] + e2[0] * (d + 58), W[1] + e2[1] * (d + 58)) - hT > -3) continue; // geliş yolu derin
           R = { x, z, d }; return true;
         }
         return false;
       },
     });
-    return yer && R ? { ...yer, R } : null;
+    if (yer && R && DE) yer.K = kuruKiyi(world, yer.K, yer.e2, hT); // seyirci yeri yüksek suda kuru kumda
+    return yer && R ? { ...yer, R, hT } : null;
   }
 
   function kur(o) {
@@ -152,7 +181,21 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
       if (ad) yerler.push({ x, z, y: ust, yaw: yaw0, rx });
       return [x, z, c, s];
     };
-    if (n === 1) {
+    if (DE) {
+      // Kum sırtı (Sandbank): kıyıya koşut uzun, basık; tepesi suyun ~0,35 m üstünde. 7 Seehund yan yana, farklı yönlerde.
+      const ust = 0.35;
+      const sirt = (la, ge, rx, rz, u) => {
+        const x = R.x + e1[0] * la + e2[0] * ge, z = R.z + e1[1] * la + e2[1] * ge;
+        const ry = Math.max(1.2, (u - (world.height(x, z) - yer.hT) + 0.6) / 0.62);
+        const g = kumGeo(rx, ry, rz, t + parca.length * 13);
+        g.rotateY(yaw0 - Math.PI / 2).translate(x, u - ry * 0.4, z); // uzun ekseni kıyıya koşut (e1); düz tepe ~0,4·ry
+        parca.push(g);
+      };
+      sirt(0, 0, 10.5, 4.6, ust);
+      sirt(-14, 2.2, 3.2, 1.8, 0.12);
+      const ys = [[-6.2, -0.7, 0.3], [-3.7, 0.6, -0.4], [-1.2, -0.4, 2.9], [1.1, 0.9, 0.2], [3.4, -0.6, 3.3], [5.8, 0.4, -0.25], [-0.2, -1.9, 1.6], [7.6, -1.2, 2.6]];
+      for (const [la, ge, dy] of ys.slice(0, n)) yerler.push({ x: R.x + e1[0] * la + e2[0] * ge, z: R.z + e1[1] * la + e2[1] * ge, y: ust, yaw: yaw0 + dy, rx: 1 });
+    } else if (n === 1) {
       ekleKaya(0, 0, T.L * 0.62, 1.3, 0.9, 0.55, true);
       ekleKaya(-T.L * 1.4, 1.2, 0.9, 1.2, 0.8, 0.25, false);
       ekleKaya(T.L * 1.2, -0.8, 0.7, 1.0, 0.6, 0.15, false);
@@ -165,6 +208,7 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
       const ys = [[-4.2, -0.1, 0.45, 0.25], [-1.3, 0.35, 0.45, -0.3], [1.5, 0.7, 0.38, 2.9], [4.2, 1.1, 0.38, 0.15], [-2.8, -0.9, 0.45, 3.4]];
       for (const [la, ge, ust, dy] of ys.slice(0, n)) yerler.push({ x: R.x + e1[0] * la + e2[0] * ge, z: R.z + e1[1] * la + e2[1] * ge, y: ust, yaw: yaw0 + dy, rx: 1 });
     }
+    G.group.position.y = DE ? yer.hT : 0; // her şey olayın ortasındaki suya göre (kum sırtı sabit; su ±0,3 m oynar)
     G.kaya.geometry.dispose();
     G.kaya.geometry = mergeGeometries(parca);
     for (const g of parca) g.dispose();
@@ -173,7 +217,8 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
     for (let j = 0; j < n; j++) {
       const Y = yerler[j];
       // Kayaya hangi yandan çıkar: denize bakan yan (yerin e2 yönünde 1,4 m).
-      const kenar = [Y.x + e2[0] * (2.0 + 0.2 * j) + e1[0] * (hr(t, 20, j) - 0.5) * 1.5, Y.z + e2[1] * (2.0 + 0.2 * j) + e1[1] * (hr(t, 20, j) - 0.5) * 1.5];
+      const kd = DE ? 4.4 - ((Y.x - R.x) * e2[0] + (Y.z - R.z) * e2[1]) : 2.0; // kum sırtının deniz kenarına
+      const kenar = [Y.x + e2[0] * (kd + 0.2 * j) + e1[0] * (hr(t, 20, j) - 0.5) * 1.5, Y.z + e2[1] * (kd + 0.2 * j) + e1[1] * (hr(t, 20, j) - 0.5) * 1.5];
       const yan = (hr(t, 21, j) - 0.5) * 2;
       const uzak = [R.x + e2[0] * (85 + 15 * hr(t, 22, j)) + e1[0] * yan * 50, R.z + e2[1] * (85 + 15 * hr(t, 22, j)) + e1[1] * yan * 50];
       const git = [R.x + e2[0] * 95 - e1[0] * yan * 60, R.z + e2[1] * 95 - e1[1] * yan * 60];
@@ -185,7 +230,7 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
     const odak = n === 1 ? [yerler[0].x, yerler[0].z] : [R.x, R.z];
     // Kamera kıyıdan, biraz çapraz (kıyı ve kayalar birlikte).
     const yon = Math.atan2(kiyi[0] - odak[0], kiyi[1] - odak[1]) + ((t >> 3) & 1 ? 0.2 : -0.2);
-    return { odak, odakY: 0.7, kalabalik: kiyi, kiyi, yon, yerAdi: K.ad.ad, zaman: null, gitD: n === 1 ? 42 : 55, gitEgim: 0.3, cekimOlcek: n === 1 ? 0.8 : 0.75 };
+    return { odak, odakY: 0.7, kalabalik: kiyi, kiyi, yon, yerAdi: DE ? K.ad.Ad : K.ad.ad, zaman: null, gitD: n === 1 ? 42 : 55, gitEgim: 0.3, cekimOlcek: n === 1 ? 0.8 : 0.75 };
   }
 
   // --- fok durumu ---
@@ -260,13 +305,14 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
     }
     G.group.visible = true;
     const ts = (minute - o.bas) * 60, kp = G.kopuk;
+    const dW = DE ? gelgitSeviye(o.day, minute) - K.yer.hT : 0; // o anki suyun olay ortasına göre farkı
     kp.bas(env?.light ?? 1);
     let kayada = 0;
     for (let j = 0; j < G.foklar.length; j++) {
       const F = G.foklar[j], f = K.F[j], d = durum(j, ts);
       F.kok.visible = d.gorunur && d.y > -1.25;
       if (!F.kok.visible) continue;
-      F.kok.position.set(d.x, d.y, d.z);
+      F.kok.position.set(d.x, d.y + (d.suda ? dW : 0), d.z);
       F.kok.rotation.set(d.pitch, d.yaw, d.roll);
       F.bas.rotation.set(-d.basK, d.basY, 0);
       F.arka.rotation.x = d.arkaK + (d.suda ? 0.25 * Math.sin(ts * 3 + j) : 0);
@@ -275,13 +321,13 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
       if (d.suda && d.y > -0.5) {
         const al = ss(-0.5, -0.15, d.y);
         const fx = Math.sin(d.yaw), fz = Math.cos(d.yaw), L = T.L * F.olc;
-        kp.ekle("leke", d.x - fx * L * 0.4, 0.04, d.z - fz * L * 0.4, 0.45 * L, 1, 0.9 * L, 0.35 * al, d.yaw);
-        kp.ekle("halka", d.x + fx * L * 0.35, 0.05, d.z + fz * L * 0.35, 0.35 * L + 0.1 * Math.sin(ts * 2 + j), 1, 0.35 * L, 0.4 * al);
+        kp.ekle("leke", d.x - fx * L * 0.4, 0.04 + dW, d.z - fz * L * 0.4, 0.45 * L, 1, 0.9 * L, 0.35 * al, d.yaw);
+        kp.ekle("halka", d.x + fx * L * 0.35, 0.05 + dW, d.z + fz * L * 0.35, 0.35 * L + 0.1 * Math.sin(ts * 2 + j), 1, 0.35 * L, 0.4 * al);
       }
       // Kayaya çıkışta ve suya girişte sıçrama.
       const L = T.L * F.olc;
-      kp.sicrama(f.kenar[0], f.kenar[1], 0.5, ts - (f.cik + 6), K.t + j * 17 + 1, L * 0.6);
-      kp.sicrama(f.kenar[0], f.kenar[1], 1.1, ts - (f.ayr + 8), K.t + j * 17 + 2, L * 0.7);
+      kp.sicrama(f.kenar[0], f.kenar[1], 0.5, ts - (f.cik + 6), K.t + j * 17 + 1, L * 0.6, dW);
+      kp.sicrama(f.kenar[0], f.kenar[1], 1.1, ts - (f.ayr + 8), K.t + j * 17 + 2, L * 0.7, dW);
     }
     K.kayada = kayada;
     kp.bitir();
@@ -292,10 +338,10 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
     const ts = (minute - K.o.bas) * 60;
     if (K.F.length > 1) {
       // Grup: sabit hedef, kaya sırtlarının ortası (foklar tek tek gelip gider; kamera çekim içinde sıçramasın).
-      return [K.yer.R.x, 0.8, K.yer.R.z];
+      return [K.yer.R.x, 0.8 + (K.yer.hT ?? 0), K.yer.R.z];
     }
     const d = durum(0, ts);
-    return [d.x, Math.max(0.4, d.y + 0.35), d.z];
+    return [d.x, Math.max(0.4, d.y + 0.35) + (K.yer.hT ?? 0), d.z];
   }
 
   /** O dakikada kayadaki fok sayısı (metin için; görüntüyle aynı takvim). */
@@ -310,6 +356,13 @@ export function buildFokOlay({ world, scene, group: olayGrubu }) {
       if (ts < ilk + 30) return { kisa: "Seals off the waterfront!", uzun: `At ${saatYaz(o.bas)} a harbor seal's head popped up off ${A.ad}; more seals are swimming toward the rocks near the shore.` };
       if (ts < sonAyr) return { kisa: `${nk || "Harbor"} seal${nk === 1 ? "" : "s"} on the rocks`, uzun: `Harbor seals hauled out on the rocks off ${A.ad} at ${saatYaz(o.bas + ilk / 60)} and are basking in the ${o.yuva ? "afternoon" : "morning"} light; ${nk === 1 ? "one is" : `${nk} are`} on the rocks right now.${izle}` };
       return { kisa: `Seals on the rocks ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`, uzun: `A group of ${enCok} harbor seals hauled out on the rocks off ${A.ad}, basked for about ${kalis} minutes and slipped back into the sea one by one.${izle}` };
+    }
+    if (DE) {
+      const Y = (m) => saatYaz(m), gun = o.yuva ? "heute Nachmittag" : "heute Vormittag";
+      const izle = (pr) => (n ? ` ${n} ${n === 1 ? (pr ? "Nachbar schaut" : "Nachbar kam") : (pr ? "Nachbarn schauen" : "Nachbarn kamen")} ${pr ? "vom Ufer aus zu" : "zum Zuschauen ans Wasser"}.` : "");
+      if (ts < ilk + 30) return { kisa: `Seehunde ${A.vor}!`, uzun: `Um ${Y(o.bas)} tauchte ${A.vor} der erste Seehundkopf auf; weitere Seehunde schwimmen auf eine Sandbank dicht vor dem Ufer zu.` };
+      if (ts < sonAyr) return { kisa: nk === 1 ? "Ein Seehund auf der Sandbank" : nk ? `${nk} Seehunde auf der Sandbank` : "Seehunde auf der Sandbank", uzun: `Seit ${Y(o.bas + ilk / 60)} liegen Seehunde auf einer Sandbank ${A.vor} und dösen${nk ? `; gerade ${nk === 1 ? "liegt einer" : `liegen ${nk}`} oben auf dem Sand` : ""}.${izle(true)}` };
+      return { kisa: `Seehunde auf der Sandbank ${gun} · ${Y(o.bas)}`, uzun: `Eine Gruppe von ${enCok} Seehunden zog sich ${A.vor} auf eine Sandbank, döste rund ${kalis} Minuten und glitt dann nacheinander zurück ins Meer.${izle(false)}` };
     }
     const izle = n ? ` ${n} kişi kıyıya inip izledi.` : "";
     if (ts < ilk + 30) return { kisa: "Kıyıda bir Akdeniz foku!", uzun: `Saat ${saatte(o.bas)} ${A.in} açığında nadir görülen bir Akdeniz foku belirdi; başını sudan çıkarıp kıyıdaki kayalara doğru yüzüyor.` };

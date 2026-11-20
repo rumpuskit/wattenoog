@@ -9,7 +9,10 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { DIL, HORTUM } from "./olay-ayar.js";
-import { TAU, ss, mix, hr, kiyiYeri, kiyiAdi, kopukHavuzu, gokKarart } from "./olay-kiyi.js";
+import { TAU, ss, mix, hr, kiyiYeri, kiyiAdi, kopukHavuzu, gokKarart, gelgitSeviye, kuruKiyi } from "./olay-kiyi.js";
+import { num } from "../fmt.js";
+// Wattenoog (DIL "de"): gelgit: hortumun tabanı ve serpinti o anki suyun üstünde; seyirciler yüksek suda kuru kumda.
+const DE = DIL === "de";
 
 function bulutGeo(tohum, R) {
   // Bulut tabanı: basık kabarcıklar (yarıçap R), altı koyu, üstü açık; ortada aşağı sarkan "duvar bulutu".
@@ -99,7 +102,7 @@ export function buildHortumOlay({ world, scene, group: olayGrubu, sky }) {
     const t = o.tohum | 0, sg = hr(t, 81) < 0.5 ? -1 : 1, uz = AY.uzak * (0.88 + 0.24 * hr(t, 82));
     let P = null;
     const yer = kiyiYeri(world, o, {
-      tuz: 5, kaynak: ["sahil_yolu", "kasaba"],
+      tuz: 5, kaynak: DE ? ["plaj", "sahil_yolu"] : ["sahil_yolu", "kasaba"],
       deniz: (W, e2, e1) => {
         // Yol: kıyıya koşut −130 → +130 m (sg), uz m açıkta; çevresi 250 m boyunca kara olmamalı (kıyıya ulaşmaz).
         for (const la of [-170, -90, 0, 90, 170]) for (const d of [uz - 250, uz, uz + 150]) {
@@ -115,6 +118,7 @@ export function buildHortumOlay({ world, scene, group: olayGrubu, sky }) {
     const A1 = [W[0] + e2[0] * (uz + 40) + e1[0] * sg * 130, W[1] + e2[1] * (uz + 40) + e1[1] * sg * 130];
     G.bulut.geometry.dispose();
     G.bulut.geometry = bulutGeo(t, AY.H * 0.95);
+    if (DE) yer.K = kuruKiyi(world, yer.K, e2, gelgitSeviye(o.day, (o.bas + o.son) / 2));
     const kiyi = yer.K, orta = [(A0[0] + A1[0]) / 2, (A0[1] + A1[1]) / 2], dist = Math.hypot(orta[0] - kiyi[0], orta[1] - kiyi[1]);
     K = { o, yer, W, e1, e2, A0, A1, Ts, t, sg, kiyi, dist, ad: kiyiAdi(world, yer, DIL), buk: [(hr(t, 83) - 0.5) * 70, (hr(t, 84) - 0.5) * 70] };
     // Odak hortumun kendisi değil, kıyıyla hortumun arasında ~200 m açıkta bir nokta: sitenin kamerası hedefi ada sınırının
@@ -122,7 +126,7 @@ export function buildHortumOlay({ world, scene, group: olayGrubu, sky }) {
     // "Olaya git": kıyı noktasının ~12 m üstünden (palmiyelerin önünde, su kenarında), ufka yakın bakış (site hedefi uçuştan sonra deniz düzeyine indiriyor:
     // yüksek kamera aşağı bakıp hortumu kadrajın üstünden kesiyordu); kalabalık çekimi seyircilerin arkasından aynı doğrultuda.
     const od = Math.min(220, dist * 0.4), odak = [kiyi[0] + (orta[0] - kiyi[0]) / dist * od, kiyi[1] + (orta[1] - kiyi[1]) / dist * od];
-    return { odak, odakY: 4, kalabalik: kiyi, kiyi, yon: Math.atan2(kiyi[0] - orta[0], kiyi[1] - orta[1]), yerAdi: K.ad.ad, zaman: null,
+    return { odak, odakY: 4, kalabalik: kiyi, kiyi, yon: Math.atan2(kiyi[0] - orta[0], kiyi[1] - orta[1]), yerAdi: DE ? K.ad.Ad : K.ad.ad, zaman: null,
       gitD: od - 6, gitEgim: 0.035, cekimOlcek: Math.max(1, (0.45 * dist) / 60), cekimOlcekH: 0.75, kalabalikArkadan: true };
   }
 
@@ -148,6 +152,7 @@ export function buildHortumOlay({ world, scene, group: olayGrubu, sky }) {
   function update(o, evre, minute, real, env) {
     if (!o || !K || K.o !== o || !evre || evre.ad === "sonra") { if (G) G.group.visible = false; if (!o) K = null; return; }
     G.group.visible = true;
+    G.group.position.y = DE ? gelgitSeviye(o.day, minute) : 0;
     const ts = (minute - o.bas) * 60, d = durum(ts), light = env?.light ?? 1;
     taban(ts, _p);
     const H = AY.H;
@@ -203,6 +208,13 @@ export function buildHortumOlay({ world, scene, group: olayGrubu, sky }) {
       if (u < 0.2) return { kisa: "Funnel cloud over the sea!", uzun: `At ${saatYaz(o.bas)} a dark cloud built up about ${m} meters off ${A.ad} and a funnel began to drop toward the water.` };
       if (u < 0.86) return { kisa: "Waterspout off the coast!", uzun: `A waterspout touched down about ${m} meters off ${A.ad} at ${saatYaz(temas)} and is crawling along the coast, spinning up spray; it is staying well out at sea.${n ? ` ${n} ${n === 1 ? "neighbor is" : "neighbors are"} watching from the shore.` : ""}` };
       return { kisa: `Waterspout ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`, uzun: `At ${saatYaz(temas)} a waterspout touched down about ${m} meters off ${A.ad}. It crawled along the coast for about ${sure} minutes without coming ashore, then thinned into a rope and broke apart.${izle}` };
+    }
+    if (DE) {
+      const gun = o.yuva ? "heute Nachmittag" : "heute Vormittag", mm = num(m);
+      const izle = (pr) => (n ? ` ${n} ${n === 1 ? (pr ? "Nachbar schaut" : "Nachbar sah") : (pr ? "Nachbarn schauen" : "Nachbarn sahen")} vom Ufer aus zu.` : "");
+      if (u < 0.2) return { kisa: "Über dem Meer bildet sich eine Wasserhose!", uzun: `Um ${saatYaz(o.bas)} ballte sich etwa ${mm} Meter ${A.vor} eine dunkle Wolke zusammen; aus ihr senkt sich ein Trichter zum Wasser.` };
+      if (u < 0.86) return { kisa: "Wasserhose vor der Küste!", uzun: `Um ${saatYaz(temas)} berührte etwa ${mm} Meter ${A.vor} eine Wasserhose das Meer; sie wirbelt Gischt auf, zieht langsam an der Küste entlang und bleibt weit draußen.${izle(true)}` };
+      return { kisa: `Wasserhose ${gun} · ${saatYaz(o.bas)}`, uzun: `Um ${saatYaz(temas)} berührte etwa ${mm} Meter ${A.vor} eine Wasserhose das Meer. Rund ${sure} Minuten zog sie an der Küste entlang, ohne an Land zu kommen, dann wurde sie dünn wie ein Seil und löste sich auf.${izle(false)}` };
     }
     const izle = n ? ` ${n} kişi kıyıdan izledi.` : "";
     if (u < 0.2) return { kisa: "Denizde hortum oluşuyor!", uzun: `Saat ${saatte(o.bas)} ${A.in} yaklaşık ${m} metre açığında koyu bir bulut oluştu; bulut tabanından denize doğru bir huni iniyor.` };

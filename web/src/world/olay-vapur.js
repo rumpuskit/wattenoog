@@ -7,9 +7,15 @@
 import * as THREE from "three";
 import { DIL } from "./olay-ayar.js";
 import { VAPUR_OLAY as V, vapurGecikmesi, vapurOlayGecikme } from "./ferry.js";
-import { romorkor, kopukHavuzu, tekneIzi, dumanKur, figurler, ease, clamp01, lerp } from "./olay-tekne.js";
+import { romorkor, kopukHavuzu, tekneIzi, dumanKur, figurler, ease, clamp01, lerp, rota } from "./olay-tekne.js";
+import { tide } from "./gelgit.js";
 
 const TUG = 18; // römorkör boyu (m)
+// Wattenoog (Almanca): feribot havuzun içinde, iskelenin ucunun ~34 m açığında (liman ağzının iç tarafında) durur; vapur yolu
+// world.ferryRun (ağızdan düz güneye, dönmeden). Schlepper Fahrrinne'den gelir, liman ağzından girer; dönüşte aynı yoldan
+// çıkar (Watt'ın kuruyan düzlüğünden geçmez). Römorkör gelgitle iner/çıkar.
+const DE = DIL === "de";
+const KANAL = [[60, 1650], [140, 1350], [80, 1100], [92, 960], [96, 905]]; // Fahrrinne → liman ağzı (dışarıdan içeri)
 
 export function buildVapurOlay({ world, scene }) {
   const f = world.features.find((x) => x.type === "vapur");
@@ -46,7 +52,10 @@ export function buildVapurOlay({ world, scene }) {
   }
 
   // Vapurun yolu (harbor.js setMinute ile aynı): u = 0 iskelede, 1 açıkta.
-  const yol = (u, out) => { out.x = f.x + 26 * u * u; out.z = f.z + 160 * u; out.h = -0.5 * Math.sin(Math.PI * Math.min(1, u * 1.6)); return out; };
+  const run = world.ferryRun;
+  const yol = run
+    ? (u, out) => { out.x = f.x + run.dx * u * u; out.z = f.z + run.dz * u; out.h = 0; return out; }
+    : (u, out) => { out.x = f.x + 26 * u * u; out.z = f.z + 160 * u; out.h = -0.5 * Math.sin(Math.PI * Math.min(1, u * 1.6)); return out; };
 
   /** Vapurun olay anındaki duruşu (t: olayın başından dk). */
   function vapurPoz(t, out) {
@@ -81,6 +90,11 @@ export function buildVapurOlay({ world, scene }) {
       // Açıktan gelir (F0 → Q: vapurun doğu yanı), sonra burnun önüne döner.
       vapurPoz(V.baglama, _v);
       const T1 = V.baglama - 2.2;
+      if (t < T1 && K.gelR) {
+        // Wattenoog: kanal rotası (F0 → liman ağzı → vapurun doğu yanı).
+        const u = (t - V.romorkor) / (T1 - V.romorkor), e = 1 - (1 - u) ** 1.6;
+        return K.gelR.at(e, out);
+      }
       if (t < T1) {
         yerel(_v, 30, 10, _w);
         const u = (t - V.romorkor) / (T1 - V.romorkor), e = 1 - (1 - u) ** 1.6; // sona doğru yavaşlar
@@ -118,6 +132,12 @@ export function buildVapurOlay({ world, scene }) {
     vapurPoz(V.yanSon, _v);
     const u = (t - V.yanSon - 2) / 10;
     yerel(_v, yan, -4, _w);
+    if (K.gitR) {
+      // Wattenoog: geri çekilip döner, liman ağzından Fahrrinne boyunca açığa (10 dk'da rotanın %75'i).
+      if (u < 0.15) { const e = ease(u / 0.15); out.x = _w.x + 6 * e; out.z = _w.z + 3 * e; out.h = lerp(-Math.PI / 2, K.gitH, e); return out; }
+      const e = (u - 0.15) / 0.85;
+      return K.gitR.at(0.75 * e * e * (1.5 - 0.5 * e), out);
+    }
     const hF = Math.atan2(K.F0[0] - _w.x - 12, K.F0[1] - _w.z - 4);
     if (u < 0.15) { const e = ease(u / 0.15); out.x = _w.x + 12 * e; out.z = _w.z + 4 * e; out.h = lerp(-Math.PI / 2, hF, e); return out; }
     const e = (u - 0.15) / 0.85, ee = e * e * (1.5 - 0.5 * e);
@@ -134,8 +154,18 @@ export function buildVapurOlay({ world, scene }) {
     const g = vapurOlayGecikme(o);
     vapurGecikmesi(g);
     // Durduğu yer: vapurun iskeleye yakın ucu iskelenin ucundan ~34 m açıkta (Driftwood'da iskele uzun: daha açıkta).
-    const uDur = Math.max(0.5, Math.min(0.85, (pier.z1 + 34 + 26 - f.z) / 160));
-    K = { o, A: g.A, A2: g.A2, F0: [f.x + 520, f.z + 2100], uDur };
+    const uDur = run ? Math.max(0.15, Math.min(0.85, (pier.z1 + 34 + 26 - f.z) / run.dz)) : Math.max(0.5, Math.min(0.85, (pier.z1 + 34 + 26 - f.z) / 160));
+    K = { o, A: g.A, A2: g.A2, F0: DE ? [...KANAL[0]] : [f.x + 520, f.z + 2100], uDur };
+    if (DE) {
+      // Römorkörün geliş ve gidiş rotaları (vapurun bağlanmadan önceki yerine göre: doğu yanı, yerel (30, 10)).
+      vapurPoz(V.baglama, _v); yerel(_v, 30, 10, _w);
+      const Q = [_w.x, _w.z];
+      K.gelR = rota([...KANAL, [Q[0], Q[1] + 45], Q]);
+      vapurPoz(V.yanSon, _v); yerel(_v, 5.6 + TUG / 2 + 0.3, -4, _w);
+      const B = [_w.x + 6, _w.z + 3];
+      K.gitR = rota([B, [B[0] + 14, B[1] + 40], [116, 860], ...[...KANAL].reverse()]);
+      K.gitH = Math.atan2(14, 40);
+    }
     const S = yol(uDur, { x: 0, z: 0, h: 0 });
     world.vapurOlay = (m) => {
       const t = m - o.bas;
@@ -151,7 +181,7 @@ export function buildVapurOlay({ world, scene }) {
     // odak dizisi her karede vapurun o anki yerine güncellenir (update): kalabalık çekimi ve "Olaya git" vapuru izler; seyirci yerleri
     // gün başında (durduğu yer) kurulur.
     K.odak = [S.x + 4, S.z + 2];
-    return { odak: K.odak, odakY: 4, kalabalik: kal, kiyi: null, yon: Math.atan2(0.55, 1), yerAdi: DIL === "en" ? "Ferry Landing" : "Vapur İskelesi", zaman: null,
+    return { odak: K.odak, odakY: 4, kalabalik: kal, kiyi: null, yon: Math.atan2(0.55, 1), yerAdi: DIL === "en" ? "Ferry Landing" : DE ? "Fähranleger" : "Vapur İskelesi", zaman: null,
       gitD: 115, gitEgim: 0.36, cekimOlcek: 1.9, cekimOlcekH: 1.5, kalabalikArkadan: true };
   }
 
@@ -170,15 +200,15 @@ export function buildVapurOlay({ world, scene }) {
     if (!G.group.visible) return;
     const sec = t * 60;
     G.tug.mesh.visible = !!tugVar;
-    if (tugVar) { G.tug.mesh.position.set(_q.x, 0.15 + 0.08 * Math.sin(real * 1.3), _q.z); G.tug.mesh.rotation.set(0.01 * Math.sin(real * 0.9), _q.h, 0.015 * Math.sin(real * 1.1)); }
+    if (tugVar) { G.tug.mesh.position.set(_q.x, 0.15 + 0.08 * Math.sin(real * 1.3) + (DE ? tide() : 0), _q.z); G.tug.mesh.rotation.set(0.01 * Math.sin(real * 0.9), _q.h, 0.015 * Math.sin(real * 1.1)); }
     // Halat: çekerken römorkörün kıçından vapurun burnuna (hafif sarkık değil, gergin).
     const halatVar = !!tugVar && t >= V.baglama - 0.15 && t < V.cekSon + 0.1;
     G.halat.visible = halatVar;
     if (halatVar) {
       vapurPoz(t, _p);
-      yerel(_p, 0, -25.6, _r); v1.set(_r.x, 3.2, _r.z);
+      yerel(_p, 0, -25.6, _r); v1.set(_r.x, 3.2 + (DE ? tide() : 0), _r.z);
       const c = Math.cos(_q.h), s = Math.sin(_q.h), kz = G.tug.kic[2];
-      v2.set(_q.x + s * kz, G.tug.kic[1], _q.z + c * kz);
+      v2.set(_q.x + s * kz, G.tug.kic[1] + (DE ? tide() : 0), _q.z + c * kz);
       const d = v2.clone().sub(v1), L = d.length();
       G.halat.position.copy(v1); G.halat.scale.set(1, L, 1);
       G.halat.quaternion.setFromUnitVectors(Y, d.normalize());
@@ -201,7 +231,7 @@ export function buildVapurOlay({ world, scene }) {
     // Kara duman: arıza anında bacadan (yerel 0, 12, −3) yoğun, 4 dakikada söner.
     if (vapurVar) {
       vapurPoz(t, _p); yerel(_p, 0, -3, _r);
-      G.duman.ciz(_r.x, 12.4, _r.z, sec, (dg) => { const dk = dg / 60 - V.ariza + 0.1; return dk < 0 ? 0 : Math.max(0, 1 - dk / 4) * (dk < 0.3 ? dk / 0.3 : 1); });
+      G.duman.ciz(_r.x, 12.4 + (DE ? tide() : 0), _r.z, sec, (dg) => { const dk = dg / 60 - V.ariza + 0.1; return dk < 0 ? 0 : Math.max(0, 1 - dk / 4) * (dk < 0.3 ? dk / 0.3 : 1); });
     } else G.duman.gizle();
   }
 
@@ -218,6 +248,15 @@ export function buildVapurOlay({ world, scene }) {
     if (!K) return null;
     const t = minute - o.bas, n = S.seyirci, ariza = o.bas + V.ariza, bekle = Math.round(V.baglama - V.ariza);
     if (t < V.ariza) return null; // henüz arıza yok (vapur yaklaşıyor)
+    if (DE) {
+      const izle = n ? (n === 1 ? " Eine Person sah vom Anleger aus zu." : ` ${n} Schaulustige sahen vom Anleger aus zu.`) : "";
+      const bas = `Um ${saatYaz(ariza)} fiel bei der einlaufenden Fähre die Maschine aus; schwarzer Rauch stieg aus dem Schornstein, und sie blieb etwa ${K.mesafe} Meter vor dem Fähranleger liegen.`;
+      if (t < V.romorkor) return { kisa: "Fähre mit Maschinenschaden!", uzun: `${bas} Die Fahrgäste warten an Deck.` };
+      if (t < V.baglama) return { kisa: "Schlepper unterwegs zur Fähre", uzun: `${bas} Ein Schlepper kommt durch die Fahrrinne; die Fahrgäste warten an Deck.` };
+      if (t >= V.cekSon && minute < K.A2) return { kisa: "Schlepper drückt die Fähre an den Anleger", uzun: `${bas} Ein Schlepper hat sie an der Leine herangezogen und drückt sie jetzt seitlich an den Anleger.` };
+      if (minute < K.A2) return { kisa: "Schlepper zieht die Fähre heran", uzun: `${bas} Ein Schlepper hat eine Leine übernommen und zieht die Fähre zum Anleger.` };
+      return { kisa: `Fähre mit Maschinenschaden ${o.yuva ? "heute Nachmittag" : "heute Vormittag"} · ${saatYaz(ariza)}`, uzun: `${bas} Nach ${bekle} Minuten kam ein Schlepper, nahm sie an die Leine und zog sie heran; um ${saatYaz(K.A2)} machte die Fähre mit 20 Minuten Verspätung fest.${izle}` };
+    }
     if (DIL === "en") {
       const izle = n ? ` ${n} ${n === 1 ? "neighbor" : "neighbors"} watched from the pier.` : "";
       const bas = `At ${saatYaz(ariza)} the ferry's engine quit as it came in; black smoke poured from its funnel and it stopped about ${K.mesafe} m off the end of the pier.`;

@@ -19,7 +19,7 @@ const yon = (dx, dz) => Math.atan2(dx, dz);
 const C = (h) => new THREE.Color(h);
 const GOK = { ust: C("#9aa3ad"), ufuk: C("#c3c9cf"), hemi: C("#e2e8ef"), zemin: C("#c9ccd0") };
 // Çocuklar kar tutunca gelir (yağışın %40'ı), en geç gün batımından ~20 dk önce eve döner (yerel dakika).
-const COCUK_SINIR = DIL === "en" ? 945 : 1020;
+const COCUK_SINIR = DIL === "en" ? 945 : DIL === "de" ? 950 : 1020; // de: Wattenoog, Dezember-Sonnenuntergang ~16:10
 
 /** Kar yağışının şiddeti (0–1) ve yerdeki kar (0–1) o dakikada; olayEvre ile aynı oranlar (olay-plan.js kar evreleri). */
 export function karDurum(o, minute) {
@@ -87,11 +87,14 @@ function oyunYeri(world, traffic) {
   const yakin = (x, z) => Math.abs(x - m[0]) < 270 && Math.abs(z - m[1]) < 270; // arama karesi + pay (açılışta hızlı)
   const agac = [...(world.trees ?? []).map((t) => [t.x, t.z]), ...world.features.filter((f) => f.type === "agac").map((f) => [f.x, f.z])].filter(([x, z]) => yakin(x, z));
   const bina = world.buildings.filter((b) => yakin(b.x, b.z));
-  const engel = [...world.features.filter((f) => f.type !== "agac" && f.x != null && yakin(f.x, f.z)).map((f) => [f.x, f.z, f.type === "cesme" || f.type === "bandstand" || f.type === "havuz" ? 7 : 1.5]),
-    ...(world.plazas ?? []).filter((p) => p.r != null && p.r < 16).map((p) => [p.x, p.z, p.r + 1])];
+  const engel = [...world.features.filter((f) => f.type !== "agac" && f.x != null && yakin(f.x, f.z)).map((f) => [f.x, f.z, f.type === "cesme" || f.type === "brunnen" || f.type === "bandstand" || f.type === "havuz" ? 7 : 1.5]),
+    ...(world.plazas ?? []).filter((p) => p.r != null && p.r < 16).map((p) => [p.x, p.z, p.r + 1]),
+    ...(world.lamps ?? []).filter((l) => yakin(l.x, l.z)).map((l) => [l.x, l.z, 1])]; // sokak lambası (kardan adam dibinde kalmasın)
   const alanlar = (world.plazas ?? []).filter((p) => (p.kind === "park" || p.kind === "cimen") && p.x0 != null);
-  const meydan = (world.plazas ?? []).find((p) => p.kind === "meydan" && p.r >= 20);
-  const icinde = (x, z) => alanlar.find((p) => x > p.x0 + 8 && x < p.x1 - 8 && z > p.z0 + 8 && z < p.z1 - 8) ?? (meydan && Math.hypot(x - meydan.x, z - meydan.z) < meydan.r - 7 ? meydan : null);
+  // Meydan: yuvarlak (r ≥ 20) ya da dikdörtgen (Wattenoog Marktplatz, ≥ 50 m).
+  const meydan = (world.plazas ?? []).find((p) => p.kind === "meydan" && (p.r >= 20 || (p.x0 != null && p.x1 - p.x0 >= 50 && p.z1 - p.z0 >= 50)));
+  const meydanda = (x, z) => meydan && (meydan.r != null ? Math.hypot(x - meydan.x, z - meydan.z) < meydan.r - 7 : x > meydan.x0 + 7 && x < meydan.x1 - 7 && z > meydan.z0 + 7 && z < meydan.z1 - 7);
+  const icinde = (x, z) => alanlar.find((p) => x > p.x0 + 8 && x < p.x1 - 8 && z > p.z0 + 8 && z < p.z1 - 8) ?? (meydanda(x, z) ? meydan : null);
   let en = null;
   for (let x = m[0] - 240; x <= m[0] + 240; x += 4) for (let z = m[1] - 240; z <= m[1] + 240; z += 4) {
     const alan = icinde(x, z);
@@ -113,6 +116,7 @@ function oyunYeri(world, traffic) {
 const YER = {
   tr: { park: ["parkta", "Park"], cimen: ["çayırda", "Çayır"], meydan: ["meydanda", "Meydan"] },
   en: { park: ["in the park", "the park"], cimen: ["on the Town Green", "the Town Green"], meydan: ["on the square", "the square"] },
+  de: { park: ["im Kurpark", "Kurpark"], cimen: ["auf der Wiese", "Wiese"], meydan: ["auf dem Marktplatz", "Marktplatz"] },
 };
 
 export function buildKarOlay({ world, scene, group: anaGrup, traffic, sky, yuzey }) {
@@ -166,7 +170,7 @@ export function buildKarOlay({ world, scene, group: anaGrup, traffic, sky, yuzey
     for (const a of atanlar) { const hedefler = atanlar.filter((b) => b.takim !== a.takim); a.hedef = hedefler[Math.floor(kesir("karHedef", o.tohum, a.x) * 2)]; a.heading = yon(a.hedef.x - a.x, a.hedef.z - a.z); }
     const adam = P0(0.4, 5.2);
     const yapanlar = [[-1.05, 4.6], [1.15, 5.5]].map(([u, v]) => { const [x, z] = P0(u, v); return { x, z, heading: yon(adam[0] - x, adam[1] - z) }; });
-    const yer0 = YER[DIL === "en" ? "en" : "tr"][yer.tur];
+    const yer0 = YER[DIL === "en" || DIL === "de" ? DIL : "tr"][yer.tur];
     K = { o, yer, P0, cocukBas, cocukSon, cocuk, atanlar, adam, yapanlar, yerDe: yer0[0], yerAd: yer0[1], izleyenler: [], adamBitti: cocukBas + 24 };
     kardanAdam.g.position.set(adam[0], world.groundY(adam[0], adam[1]), adam[1]);
     kardanAdam.g.rotation.y = yon(-s, c) + Math.PI; // yüzü oyun alanına
@@ -354,6 +358,16 @@ export function buildKarOlay({ world, scene, group: anaGrup, traffic, sky, yuzey
       const ferry = vapur ? " The ferry came in to the dock through the falling snow." : "";
       if (yagiyor) return { kisa: oyun ? `Snow day! Snowball fight ${K.yerDe}` : "It's snowing on the island!", uzun: `Snow started falling at ${saatYaz(o.bas)}; roofs, streets and trees are turning white.${kids}${ferry}` };
       return { kisa: `Snow ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`, uzun: `Snow fell for ${sure} minutes from ${saatYaz(o.bas)} and covered the roofs, streets and trees in white.${kids}${ferry}` };
+    }
+    if (DIL === "de") {
+      // Schnee auf Wattenoog: Schneeballschlacht, Schneemann; Fähre fährt weiter.
+      const zus = izle ? ` ${izle} ${izle === 1 ? "Nachbar schaute" : "Nachbarn schauten"} zu.` : "";
+      const kids = !oyun ? "" : oynuyor
+        ? ` Kinder liefern sich ${K.yerDe} eine Schneeballschlacht${adam ? " und haben einen Schneemann gebaut" : ""}.${zus}`
+        : ` Kinder lieferten sich ${K.yerDe} eine Schneeballschlacht${adam ? " und bauten einen Schneemann" : ""}.${zus}`;
+      const ferry = vapur ? " Die Fähre legte im Schneetreiben am Fähranleger an." : "";
+      if (yagiyor) return { kisa: oyun ? `Schnee! Schneeballschlacht ${K.yerDe}` : "Es schneit auf Wattenoog!", uzun: `Seit ${saatYaz(o.bas)} schneit es; Dächer, Straßen und Bäume werden weiß.${kids}${ferry}` };
+      return { kisa: `Schnee ${o.yuva ? "heute Nachmittag" : "heute Vormittag"} · ${saatYaz(o.bas)}`, uzun: `Ab ${saatYaz(o.bas)} schneite es ${sure} Minuten lang; Dächer, Straßen und Bäume sind weiß.${kids}${ferry}` };
     }
     const kids = !oyun ? "" : oynuyor
       ? ` Çocuklar ${K.yerDe} kartopu oynuyor${adam ? "; bir de kardan adam yaptılar" : ""}.${izle ? ` ${izle} komşu gelip izledi.` : ""}`

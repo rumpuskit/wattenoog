@@ -155,5 +155,8 @@ export function pusula(a, dil = "tr") {
   const k = Math.round((((a / (Math.PI / 4)) % 8) + 8) % 8);
   const TR = ["güneye", "güneydoğuya", "doğuya", "kuzeydoğuya", "kuzeye", "kuzeybatıya", "batıya", "güneybatıya", "güneye"];
   const EN = ["south", "southeast", "east", "northeast", "north", "northwest", "west", "southwest", "south"];
-  return (dil === "tr" ? TR : EN)[k];
+  // Almanca: yön sıfatı ("nördlich des Ortes", "Richtung Norden" için DE_AD).
+  const DE = ["südlich", "südöstlich", "östlich", "nordöstlich", "nördlich", "nordwestlich", "westlich", "südwestlich", "südlich"];
+  const DE_AD = ["Süden", "Südosten", "Osten", "Nordosten", "Norden", "Nordwesten", "Westen", "Südwesten", "Süden"];
+  return (dil === "tr" ? TR : dil === "de" ? DE : dil === "de-ad" ? DE_AD : EN)[k];
 }

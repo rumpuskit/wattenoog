@@ -5,6 +5,8 @@
 //   kopukHavuzu(group, sayilar) → örnekli köpük/damla/sis havuzu (karede ayırma yok; her kare bas() … bitir())
 //   govde / levha / kure / boyaLevha / suAlti: düşük poligonlu hayvan geometrisi (deniz.js ile aynı yaklaşım)
 import * as THREE from "three";
+import { tideLevel } from "./gelgit.js";
+import { unixOf } from "../sim.js";
 
 export const TAU = Math.PI * 2;
 export const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -325,6 +327,7 @@ export function kiyiAdi(world, yer, dil) {
   const L = world.labels ?? [], [x, z] = yer.W;
   let lb = null, dmin = 160;
   for (const l of L) { const d = Math.hypot((l.x ?? 0) - x, (l.z ?? 0) - z); if (d < dmin && /İskele|Liman|Plaj|Landing|Wharf|Beach|Pier/i.test(l.text ?? "")) { dmin = d; lb = l.text; } }
+  if (dil === "de") return kiyiAdiDe(world, yer);
   if (dil === "en") {
     if (yer.ad === "plaj") return { ad: "the beach" };
     if (lb) return { ad: `the ${lb}` };
@@ -336,4 +339,47 @@ export function kiyiAdi(world, yer, dil) {
   if (lb === "Vapur İskelesi") return { ad: lb, in: "Vapur İskelesi'nin", da: "Vapur İskelesi'nde", i: "Vapur İskelesi'ni" };
   if (lb === "Yük Limanı") return { ad: lb, in: "Yük Limanı'nın", da: "Yük Limanı'nda", i: "Yük Limanı'nı" };
   return { ad: "Kıyı", in: "kıyının", da: "kıyıda", i: "kıyıyı" };
+}
+
+/** Almanca kıyı adı (Wattenoog): { ad: "der Hauptstrand" (yalın, artikelli), Ad: "Hauptstrand" (artikelsiz, başlık),
+ *  vor: "vor dem Hauptstrand" (denizdeki olayın yeri), an: "am Hauptstrand" (seyircilerin yeri), zu: "zum Hauptstrand" }.
+ *  Ad dünyanın etiketlerinden (Fähranleger, Kutterhafen, Hauptstrand, Hafen, Versorgungshafen, Promenade); yoksa kıyının
+ *  hangi yanında olduğuna göre: kuzey Strand, güney Deich (Watt yanı). */
+const DE_YER = {
+  m: (A) => ({ ad: `der ${A}`, Ad: A, vor: `vor dem ${A}`, an: `am ${A}`, zu: `zum ${A}` }),
+  f: (A) => ({ ad: `die ${A}`, Ad: A, vor: `vor der ${A}`, an: `an der ${A}`, zu: `zur ${A}` }),
+};
+const DE_ETIKET = { Fähranleger: "m", Kutterhafen: "m", Hauptstrand: "m", Hafen: "m", Versorgungshafen: "m", Seehundstation: "f" };
+function kiyiAdiDe(world, yer) {
+  if (yer.ad === "sahil_yolu") return DE_YER.f("Promenade");
+  if (yer.ad === "plaj") return DE_YER.m("Hauptstrand");
+  if (yer.ad === "iskele") return DE_YER.m("Kutterhafen");
+  const L = world.labels ?? [], [x, z] = yer.W;
+  let lb = null, dmin = 200;
+  for (const l of L) { const d = Math.hypot((l.x ?? 0) - x, (l.z ?? 0) - z); if (d < dmin && DE_ETIKET[l.text]) { dmin = d; lb = l.text; } }
+  if (lb) return DE_YER[DE_ETIKET[lb]](lb);
+  // Etiket yoksa kıyının yanı: deniz kuzeyde (e2 −z) → Strand; güneyde → Deich (Watt yanı).
+  const e2z = yer.e2?.[1] ?? (z < -420 ? -1 : 1);
+  return e2z < 0 ? DE_YER.m("Strand") : DE_YER.m("Deich");
+}
+
+/** Gelgit (Wattenoog; gelgit.js): plan günü ve dakikasında su seviyesi (m, ortalama 0). Gelgitsiz adada tideLevel yine
+ *  saf işlevdir; olay modülleri yalnız DIL "de"de kullanır. */
+export const gelgitSeviye = (day, minute) => tideLevel(unixOf(day, minute));
+/** Seyirci kıyı noktası suyun içindeyse (yüksek su: kumsalda su çizgisi ~35 m oynar) kara yönünde (−e2) kuru ve
+ *  yürünebilir ilk noktaya çeker; [x, z]. */
+export function kuruKiyi(world, K, e2, hT, pay = 0.35) {
+  for (let s = 0; s <= 80; s += 2) {
+    const x = K[0] - e2[0] * s, z = K[1] - e2[1] * s;
+    if (world.height(x, z) > hT + pay && world.isWalkable(x, z)) return [x, z];
+  }
+  return K;
+}
+/** (W)'den deniz yönünde (e2) su çizgisi: yüksekliğin hT'nin altına indiği ilk nokta (önce 60 m kara tarafından başlar). */
+export function suCizgisi(world, W, e2, hT) {
+  for (let s = -60; s <= 120; s += 0.5) {
+    const x = W[0] + e2[0] * s, z = W[1] + e2[1] * s;
+    if (world.height(x, z) <= hT) return [x, z];
+  }
+  return W;
 }

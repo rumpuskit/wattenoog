@@ -56,11 +56,15 @@ export function gunBatimi(day) {
 /** Olay modüllerinin dili ve adları. Wattenoog-Zeppelin 150. sakinde açılır; o zamana dek inen zeplin adanın üstünden
  *  geçen yabancı bir reklam zeplinidir. */
 export const DIL = "de";
+// Almanca alanlar: ad (yalın), Ad (artikelsiz), auf (bulunma: "auf dem Sportplatz"), ziel (yönelme: "auf den Sportplatz").
+// İniş alanı türü (olay-zeplin.js inisYeri, olay-balon.js): saha, park (Kurpark), tarla (Polder), cimen (yedekSaha).
 export const ZEPLIN = {
-  kendi: { ad: "der Wattenoog-Zeppelin" },
-  ziyaretci: { ad: "ein Werbezeppelin" },
-  saha: { ad: "der Sportplatz" },
-  yedekSaha: { ad: "der Marktplatz" },
+  kendi: { ad: "der Wattenoog-Zeppelin", Ad: "Der Wattenoog-Zeppelin", bei: "beim Wattenoog-Zeppelin" },
+  ziyaretci: { ad: "ein Werbezeppelin", Ad: "Ein Werbezeppelin", der: "der Werbezeppelin", bei: "bei einem Werbezeppelin" },
+  saha: { ad: "der Sportplatz", Ad: "Sportplatz", auf: "auf dem Sportplatz", ziel: "auf den Sportplatz" },
+  yedekSaha: { ad: "eine Wiese am Ortsrand", Ad: "Wiese am Ortsrand", auf: "auf einer Wiese am Ortsrand", ziel: "auf eine Wiese am Ortsrand" },
+  park: { ad: "der Kurpark", Ad: "Kurpark", auf: "im Kurpark", ziel: "in den Kurpark" },
+  tarla: { ad: "die Felder am Polder", Ad: "Polder", auf: "auf den Feldern am Polder", ziel: "auf die Felder am Polder" },
 };
 /** Tür listesi sürümleri (olay-plan.js): yeni türler yalnız sürümün gününden itibaren takvime girer; önceki günler değişmez.
  *  22 Kasım'dan itibaren HANGİ gün hangi türün çıkacağını olay-plan.js tema düzeni seçer (üç ada birlikte). */
@@ -75,15 +79,19 @@ export const ADLAR = {
   fok: ["Seehundlar", "Seehunde auf der Sandbank"], yunus: ["Muturlar", "Schweinswale"], zeplin: ["Zeplin acil inişi", "Zeppelin-Notlandung"],
   dugun: ["Düğün konvoyu", "Hochzeitskorso"], hortum: ["Su hortumu", "Wasserhose"], gemi: ["Dev gemi", "Containerriese"],
   balon: ["Balonlar", "Heißluftballons"], ucurtma: ["Uçurtma şenliği", "Drachenfest"], kus: ["Göçmen kazlar", "Ringelgänse"],
-  film: ["Film çekimi", "Krimi-Dreh"], yaris: ["Ada maratonu", "Inselmarathon"], marti: ["Martı Fischbrötchen kaptı", "Möwe klaut Fischbrötchen"],
+  film: ["Film çekimi", "Krimi-Dreh"], yaris: ["Ada maratonu", "Volkslauf"], marti: ["Martı Fischbrötchen kaptı", "Möwe klaut Fischbrötchen"],
   dalga: ["Fırtına kabarması", "Sturmflut"], kar: ["Kar", "Schnee"], vapur: ["Feribot arızası", "Fähre mit Maschinenschaden"],
   balik: ["Dev av", "Riesenfang"], tekne_yarisi: ["Kutter yarışı", "Kutterregatta"], elektrik: ["Elektrik kesintisi", "Stromausfall"],
 };
-/** Kuş olayı (olay-kus.js): Ringelgans sürüsü (göç), Watt üstünde döner, setin önündeki bataklığa iner. */
-export const KUS = { tur: "kaz", evre: [[0.15, "gelis"], [0.75, "termik"], [1, "gidis"]] };
+/** Kuş olayı (olay-kus.js kaz): Ringelgans sürüsü batıdan Watt üstünden gelir, bataklığın üstünde döner (gelis), küçük
+ *  gruplar halinde iner (inis), Salzwiese'de otlar (otlama), birlikte doğuya uçar (gidis). */
+export const KUS = { tur: "kaz", evre: [[0.2, "gelis"], [0.36, "inis"], [0.82, "otlama"], [1, "gidis"]] };
 /** Drachenfest (olay-ucurtma.js): setin önündeki çayırda değil, Marktplatz'ın kuzeyindeki Kurpark'ta değil: kumsalda. */
 export const UCURTMA = { yer: "plaj", ad: "der Hauptstrand" };
 /** Seehunde: bir grup liman foku (benekli, küçük) Seehundbank'ta ve kıyıda. */
 export const FOK = { tur: "liman", sayi: 7 };
+/** Yunus olayının hayvanı (deniz.js): "schweinswal" = Kuzey Denizi muturu (1,6 m, koyu gri, küt baş, alçak üçgen yüzgeç;
+ *  sıçramaz, nefes alırken sırtı yuvarlanarak görünür; sürü 3–6). Yoksa şişe burunlu yunus. */
+export const YUNUS = { tur: "schweinswal" };
 /** Wasserhose: kıyıdan uzaklık (m) ve bulut tabanı yüksekliği (m). */
 export const HORTUM = { uzak: 520, H: 320 };

@@ -7,10 +7,18 @@
 import * as THREE from "three";
 import { DIL } from "./olay-ayar.js";
 import { roll } from "../sim.js";
-import { balikciTeknesi, istakozTeknesi, kopukHavuzu, tekneIzi, birlestir, TEKNE_MAT, ease, clamp01, lerp } from "./olay-tekne.js";
+import { balikciTeknesi, istakozTeknesi, kopukHavuzu, tekneIzi, birlestir, TEKNE_MAT, ease, clamp01, lerp, rota, heilbuttGeo } from "./olay-tekne.js";
 import { box, colored, cyl } from "./harbor.js";
+import { tide } from "./gelgit.js";
+import { ferryOut } from "./ferry.js";
+import { num } from "../fmt.js";
 
 const EN = DIL === "en";
+// Wattenoog (Almanca): Fischkutter dev bir Heilbutt'la (2,4 m) Fahrrinne'den liman ağzına, oradan Kutterhafen'in yüzer
+// iskelesine gelir; Heilbutt kuyruğundan Fischgalgen'e asılır. Tekne gelgitle iner/çıkar; Watt'ta yalnız kanaldan geçer ve
+// liman ağzını feribot hareket hâlindeyken geçmez (ağzın dışında, Fahrrinne'de bekler).
+const DE = DIL === "de";
+const HB = 2.4; // Heilbutt boyu (m)
 // Evre sınırları (olay-plan.js E.balik ile aynı): dönüş 0–0.3, yanaşma –0.42, indirme –0.58, fotoğraf –1.
 const F = { yanas: 0.3, dok: 0.42, kaldir0: 0.44, kaldir1: 0.48, cevir1: 0.53, indir1: 0.56, birak: 0.57, geri1: 0.61 };
 
@@ -109,7 +117,7 @@ export function buildBalikOlay({ world, scene }) {
 
   function geoKur() {
     const group = new THREE.Group(); group.name = "olay-balik"; scene.add(group);
-    const tekne = EN ? istakozTeknesi(11, "#f4f1ea", "#2a6b4a", "#f6f4ee") : balikciTeknesi(13);
+    const tekne = EN ? istakozTeknesi(11, "#f4f1ea", "#2a6b4a", "#f6f4ee") : DE ? balikciTeknesi(13, { top: "#1f3f5f", stripe: "#f4f1ea", deck: "#8f6a49" }) : balikciTeknesi(13);
     group.add(tekne.mesh);
     // Bumba (yük kolu): birim boy, +z yönünde; mafsalda döner.
     const bumba = new THREE.Mesh(birlestir([cyl(0.07, 0.05, 1, 0, 0.5, 0, "#d9d4c8", 6).rotateX(Math.PI / 2), box(0.12, 0.12, 0.12, 0, 0, 1, "#3a3f47")]), TEKNE_MAT());
@@ -132,7 +140,7 @@ export function buildBalikOlay({ world, scene }) {
       });
       av.userData.ist = ist;
     } else {
-      av = new THREE.Mesh(orkinosGeo(3.1), TEKNE_MAT());
+      av = new THREE.Mesh(DE ? heilbuttGeo(HB, -1) : orkinosGeo(3.1), TEKNE_MAT());
       aski = new THREE.Mesh(askiGeo(1.9, 4.7), TEKNE_MAT()); group.add(aski);
     }
     av.traverse((m) => { if (m.isMesh) m.castShadow = true; });
@@ -162,17 +170,48 @@ export function buildBalikOlay({ world, scene }) {
     const bl = EN ? r / Math.cos(0.5) : G.tekne.bumbaBoy, egim = Math.acos(Math.min(0.95, r / bl));
     const kancaY = EN ? top + 0.5 : top + 4.7 - 1.0; // av asılınca kuyruğun/kasanın tutulduğu yükseklik
     const S0 = { x: dok.x + 300, z: dok.z + 2100 }, C1 = { x: dok.x, z: dok.z + 260 };
+    // Wattenoog: Fahrrinne (island.js PRIELE ilk kanal) → liman ağzı (x 30…150) → havuz → iskelenin doğu yanı.
+    const R = DE ? rota([[120, 2100], [60, 1650], [140, 1350], [80, 1100], [92, 960], [74, 880], [30, 800], [dok.x + 4, dok.z + 40], [dok.x, dok.z + 14], [dok.x, dok.z]]) : null;
     // Güvertedeki av: bumbanın dinlenme yönünde, aynı yatay uzaklıkta (kaldırırken dikine çıkar).
-    const guverte = EN ? [mafsal[0] - r * Math.sin(0.0) * 0, H.deckY(0.2) + 0.02, mafsal[2] - r] : [0, H.deckY(0.2) + 0.25, mafsal[2] - r];
-    K = { o, D, T, dok, son, mafsal, r, bl, egim, kancaY, S0, C1, top, guverte, len, beam };
+    // Wattenoog: kıçta kaptan köşkü olduğu için Heilbutt pruva güvertesinde yatar, bumba dinlenirken pruvaya bakar.
+    const guverte = EN ? [mafsal[0] - r * Math.sin(0.0) * 0, H.deckY(0.2) + 0.02, mafsal[2] - r] : DE ? [0, H.deckY(0.8) + 0.12, mafsal[2] + r] : [0, H.deckY(0.2) + 0.25, mafsal[2] - r];
+    K = { o, D, T, dok, son, mafsal, r, bl, egim, kancaY, S0, C1, top, guverte, len, beam, R, L: DE ? HB : 3.1 };
+    if (DE) K.ilerle = ilerlemeTablosu(K);
     if (aski()) { G.aski.position.set(son.x, top, son.z); G.aski.rotation.y = 0; }
     // Kalabalık iskelenin karaya yakın yarısında ve kıyıdaki tahta yolda (av karşılarında).
     const kal = [j.x, j.z0 + (j.z1 - j.z0) * 0.35];
-    return { odak: [son.x + 0.8, son.z - 0.5], odakY: EN ? 2.0 : 3.2, kalabalik: kal, kiyi: null, yon: Math.atan2(-0.5, 0.86), yerAdi: EN ? "Fishing Wharf" : "Balıkçı Koyu", zaman: null,
+    return { odak: [son.x + 0.8, son.z - 0.5], odakY: EN ? 2.0 : 3.2, kalabalik: kal, kiyi: null, yon: Math.atan2(-0.5, 0.86), yerAdi: EN ? "Fishing Wharf" : DE ? "Kutterhafen" : "Balıkçı Koyu", zaman: null,
       gitD: EN ? 30 : 46, gitEgim: 0.32, cekimOlcek: EN ? 0.55 : 0.75, cekimOlcekH: EN ? 0.6 : 0.8, kalabalikArkadan: true };
   }
   const aski = () => G?.aski;
   const yerel = (P, lx, lz, out) => { const c = Math.cos(P.h), s = Math.sin(P.h); out.x = P.x + lx * c + lz * s; out.z = P.z - lx * s + lz * c; return out; };
+
+  /** Wattenoog: dönüş ve yanaşmanın (0..F.dok) rota ilerlemesi (e 0..1), saniyede bir. Liman ağzı bölgesi (feribot
+   *  koridoru: x > 74, 790 < z < 1200) feribot hareket hâlindeyken (ferryOut 0 < u < 0.98) geçilmez: bölgeye giriş anı
+   *  (ts) olağan andan (ts0) en az kayan, geçişin tamamı serbest olan an seçilir (±5 dk); giriş öncesi sabit hız, sonrası
+   *  yavaşlayarak yanaşma. Saf: (plan, dünya, feribot düzeni) işlevi. */
+  function ilerlemeTablosu(K) {
+    const Ts = Math.round(F.dok * K.D * 60), out = new Float32Array(Ts + 1), P = { x: 0, z: 0, h: 0 };
+    const bolgede = (e) => { K.R.at(e, P); return P.x > 74 && P.z < 1200 && P.z > 790; };
+    let e1 = -1, e2 = -1;
+    for (let e = 0; e <= 1.0001; e += 0.002) { const b = bolgede(e); if (b && e1 < 0) e1 = e; if (!b && e1 >= 0 && e2 < 0) e2 = e; }
+    const ts0 = Math.round((e1 / 0.85) * F.yanas * K.D * 60);
+    const ikinci = (t, ts) => { const w = clamp01((t - ts) / (Ts - ts)); return e1 + (1 - e1) * (1 - (1 - w) ** 2.2); };
+    const serbest = (ts) => {
+      let t = ts; while (t < Ts && ikinci(t, ts) < e2) t += 5;
+      for (let k = ts - 20; k <= t + 20; k += 10) { const f = ferryOut(K.o.bas + k / 60); if (f > 0.001 && f < 0.98) return false; }
+      return true;
+    };
+    let ts = ts0;
+    for (let d = 0; d <= 300; d += 10) {
+      if (ts0 + d < Ts - 150 && serbest(ts0 + d)) { ts = ts0 + d; break; }
+      if (ts0 - d > 120 && serbest(ts0 - d)) { ts = ts0 - d; break; }
+    }
+    for (let t = 0; t <= Ts; t++) out[t] = t < ts ? (e1 * t) / ts : ikinci(t, ts);
+    out[Ts] = 1;
+    return out;
+  }
+  const tabloOku = (T, sn) => { const i = Math.max(0, Math.min(T.length - 1, sn)), a = Math.floor(i), b = Math.min(T.length - 1, a + 1); return T[a] + (T[b] - T[a]) * (i - a); };
 
   /** Teknenin duruşu (dakika); olaydan önce null. */
   function teknePoz(m, out) {
@@ -182,6 +221,7 @@ export function buildBalikOlay({ world, scene }) {
     if (u < F.yanas) e = 0.85 * (u / F.yanas);
     else if (u < F.dok) { const w = (u - F.yanas) / (F.dok - F.yanas); e = 0.85 + 0.15 * (1 - (1 - w) ** 2.2); }
     else { out.x = K.dok.x; out.z = K.dok.z; out.h = K.dok.h; return out; }
+    if (K.R) return K.R.at(tabloOku(K.ilerle, (m - K.o.bas) * 60), out);
     const a = K.S0, b = K.C1, c = K.dok, n = 1 - e;
     out.x = n * n * a.x + 2 * n * e * b.x + e * e * c.x; out.z = n * n * a.z + 2 * n * e * b.z + e * e * c.z;
     const tx = 2 * n * (b.x - a.x) + 2 * e * (c.x - b.x), tz = 2 * n * (b.z - a.z) + 2 * e * (c.z - b.z);
@@ -193,7 +233,7 @@ export function buildBalikOlay({ world, scene }) {
   function vinc(m) {
     const u = (m - K.o.bas) / K.D, P = K.dok;
     const mw = yerel(P, K.mafsal[0], K.mafsal[2], {});
-    const azDinlen = P.h + Math.PI; // teknenin kıçına doğru (güvertedeki ava)
+    const azDinlen = P.h + (DE ? 0 : Math.PI); // teknenin kıçına doğru (güvertedeki ava; Wattenoog: pruvaya)
     const azAvYeri = Math.atan2(K.son.x - mw.x, K.son.z - mw.z);
     let d = azAvYeri - azDinlen; d = Math.atan2(Math.sin(d), Math.cos(d));
     let az = azDinlen, durum = "guverte", kalk = 0;
@@ -210,7 +250,7 @@ export function buildBalikOlay({ world, scene }) {
     if (!G) return;
     if (!o || !K || K.o !== o || minute < o.bas) { G.group.visible = false; return; }
     G.group.visible = true;
-    const t = real, bob = 0.06 * Math.sin(t * 1.1), P = teknePoz(minute, _p);
+    const t = real, bob = 0.06 * Math.sin(t * 1.1) + (DE ? tide() : 0), P = teknePoz(minute, _p);
     const tk = G.tekne.mesh;
     tk.position.set(P.x, 0.08 + bob, P.z); tk.rotation.set(0.012 * Math.sin(t * 0.8), P.h, 0.02 * Math.sin(t * 0.9));
     const V = vinc(minute);
@@ -220,19 +260,19 @@ export function buildBalikOlay({ world, scene }) {
     if (docked) {
       v1.set(V.mw.x, K.mafsal[1] + yukS, V.mw.z); v2.set(V.uc.x, V.uc.y + yukS, V.uc.z);
     } else {
-      const mw = yerel(P, K.mafsal[0], K.mafsal[2], {}), az = P.h + Math.PI, ce = Math.cos(K.egim), se = Math.sin(K.egim);
+      const mw = yerel(P, K.mafsal[0], K.mafsal[2], {}), az = P.h + (DE ? 0 : Math.PI), ce = Math.cos(K.egim), se = Math.sin(K.egim);
       v1.set(mw.x, K.mafsal[1] + yukS, mw.z); v2.set(mw.x + Math.sin(az) * K.bl * ce, K.mafsal[1] + yukS + K.bl * se, mw.z + Math.cos(az) * K.bl * ce);
     }
     G.bumba.position.copy(v1); G.bumba.scale.set(1, 1, v1.distanceTo(v2)); G.bumba.lookAt(v2);
     // Av.
     const av = G.av, sal = 0.06 * Math.sin(t * 1.3);
     let halatAlt = null;
-    const L = 3.1;
+    const L = K.L;
     if (!docked || V.durum === "guverte") {
       // Güvertede yatıyor (orkinos boylamasına, ıstakoz kasasında).
       const g = yerel(P, K.guverte[0], K.guverte[2], {});
       av.position.set(g.x, K.guverte[1] + yukS, g.z);
-      av.rotation.set(0, P.h + (EN ? 0 : Math.PI), 0);
+      av.rotation.set(0, P.h + (EN ? 0 : Math.PI), DE ? -Math.PI / 2 : 0, "YXZ"); // Heilbutt gözlü yüzü (−x) yukarı yatar
     } else if (V.durum === "yerinde") {
       if (EN) { av.position.set(K.son.x, K.top, K.son.z); av.rotation.set(0, -0.6, 0); } // kıskaçlar denize/kameraya
       else { av.position.set(K.son.x, K.kancaY - L / 2, K.son.z); av.rotation.set(Math.PI / 2, 1.05 + 0.08 * Math.sin(t * 0.7), 0, "YXZ"); } // böğrü kameraya (güneybatı) dönük
@@ -245,7 +285,7 @@ export function buildBalikOlay({ world, scene }) {
       if (EN) { av.position.set(hx + sal * 0.3, ustY - 0.5, hz); av.rotation.set(0, V.az, 0); }
       else {
         const dik = V.durum === "kalkiyor" ? ease(Math.min(1, V.kalk * 1.6)) : 1;
-        av.rotation.set(dik * Math.PI / 2, P.h + Math.PI + sal, 0, "YXZ");
+        av.rotation.set(dik * Math.PI / 2, P.h + Math.PI + sal, DE ? -(1 - dik) * Math.PI / 2 : 0, "YXZ");
         av.position.set(hx, ustY - (L / 2) * Math.sin(dik * Math.PI / 2) - 0.25 * (1 - dik), hz);
       }
     }
@@ -294,6 +334,15 @@ export function buildBalikOlay({ world, scene }) {
     if (!K) return null;
     const u = (minute - o.bas) / K.D, n = S.seyirci, dok = K.T(F.dok), asildi = K.T(F.birak);
     const bal = K.balikci ? (EN ? (K.balikci > 1 ? " The wharf's lobstermen stood by the catch." : " A Driftwood lobsterman stood by the catch.") : (K.balikci > 1 ? " Koyun balıkçıları orkinosun yanında durdu." : " Koyun bir balıkçısı orkinosun yanında durdu.")) : "";
+    if (DE) {
+      const m = num(HB);
+      const izle = n ? (n === 1 ? " Eine Person kam zum Fotografieren an den Kutterhafen." : ` ${n} Schaulustige kamen zum Fotografieren an den Kutterhafen.`) : "";
+      const bes = K.balikci ? (K.balikci > 1 ? " Zwei Leute von der Kutterhafen-Crew stellten sich stolz neben den Fang." : " Jemand von der Kutterhafen-Crew stellte sich stolz neben den Fang.") : "";
+      if (u < F.yanas) return { kisa: "Kutter mit Riesenheilbutt im Anmarsch!", uzun: `Seit ${saatYaz(o.bas)} läuft ein Fischkutter durch die Fahrrinne auf den Kutterhafen zu, an Deck ein ${m} Meter langer Heilbutt.` };
+      if (u < F.dok) return { kisa: "Kutter mit Riesenheilbutt legt an", uzun: `Der Fischkutter mit dem ${m} Meter langen Heilbutt an Deck legt am Steg im Kutterhafen an.` };
+      if (u < F.birak) return { kisa: "Riesenheilbutt wird an Land gehievt", uzun: `Um ${saatYaz(dok)} machte der Kutter im Kutterhafen fest; der Heilbutt wird mit dem Ladebaum an den Fischgalgen gehievt.` };
+      return { kisa: `Riesenheilbutt im Kutterhafen · ${saatYaz(dok)}`, uzun: `Um ${saatYaz(o.bas)} brachte ein Fischkutter einen ${m} Meter langen Heilbutt in den Kutterhafen. Seit ${saatYaz(asildi)} hängt er am Fischgalgen auf dem Steg.${izle}${bes}` };
+    }
     if (EN) {
       const izle = n ? ` ${n} ${n === 1 ? "neighbor" : "neighbors"} came down to take pictures.` : "";
       if (u < F.yanas) return { kisa: "Giant lobster on its way in!", uzun: `At ${saatYaz(o.bas)} a lobster boat came in from offshore heading for the Fishing Wharf with a giant lobster on deck, about six feet long with its claws.` };

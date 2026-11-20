@@ -1076,7 +1076,7 @@ function buildFeatures(world) {
         add(new THREE.BoxGeometry(7, 0.35, 12), white, f.x + 3.5, y0 + 4.2, f.z);
         // Bant saçağın ön kenarında, boyu z ekseninde (yazı +x yüzünde okunur).
         // Gece ışıklı tabela: yazı dokusu kendi ışığıyla parlar (setFlood).
-        const acil = label("EMERGENCY", 12, 0.8, "#d8342b", "#ffffff");
+        const acil = label("NOTAUFNAHME", 12, 0.8, "#d8342b", "#ffffff");
         acil.emissive = new THREE.Color("#ffffff"); acil.emissiveMap = acil.map; acil.emissiveIntensity = 0;
         glowSigns.push(acil);
         add(new THREE.BoxGeometry(0.1, 0.8, 12), acil, f.x + 7.05, y0 + 3.85, f.z, 0, false);
@@ -1088,7 +1088,7 @@ function buildFeatures(world) {
         for (const dz of [-6, 6]) {
           const cz = f.z + dz;
           for (const [x, z, w, d] of [[f.x + 9, cz - 1.75, 9, 0.12], [f.x + 9, cz + 1.75, 9, 0.12], [f.x + 4.5, cz, 0.12, 3.5]]) add(new THREE.BoxGeometry(w, 0.02, d), paint, x, y0 + 0.22, z, 0, false);
-          const tag = add(new THREE.PlaneGeometry(3.2, 0.9), label("AMBULANS", 3.2, 0.9, "#00000000", "#f4f1ea"), f.x + 10, y0 + 0.235, cz, 0, false);
+          const tag = add(new THREE.PlaneGeometry(3.2, 0.9), label("RETTUNGSWAGEN", 3.2, 0.9, "#00000000", "#f4f1ea"), f.x + 10, y0 + 0.235, cz, 0, false);
           tag.rotation.x = -Math.PI / 2; tag.rotation.z = Math.PI / 2; tag.material.transparent = true;
         }
         for (let k = 0; k < 6; k++) add(new THREE.BoxGeometry(0.4, 0.02, 3), yellow, f.x + 15 + k * 0.9, y0 + 0.22, f.z - 10, 0.6, false);

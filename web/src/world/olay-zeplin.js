@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { Zeplin } from "./zeplin.js";
 import { DIL, ZEPLIN as AD } from "./olay-ayar.js";
 import { isHoliday } from "../sim.js";
+import { acikAlan } from "./olay-yardim.js";
 
 const lerp = THREE.MathUtils.lerp;
 const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
@@ -27,7 +28,7 @@ function inisYeri(world, o) {
   };
   const adaylar = [];
   if (world.pitch && sahaBos) adaylar.push({ x0: world.pitch.x0, x1: world.pitch.x1, z0: world.pitch.z0, z1: world.pitch.z1, saha: true });
-  for (const p of world.plazas ?? []) if (["cimen", "park", "tarla", "saha"].includes(p.kind) && p.x0 != null) adaylar.push({ x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1 });
+  for (const p of world.plazas ?? []) if (["cimen", "park", "tarla", "saha"].includes(p.kind) && p.x0 != null) adaylar.push({ x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, kind: p.kind });
   const daireler = (world.plazas ?? []).filter((p) => p.r != null);
   adaylar.sort((a, b) => (b.saha ? 1e9 : 0) + (b.x1 - b.x0) * (b.z1 - b.z0) - ((a.saha ? 1e9 : 0) + (a.x1 - a.x0) * (a.z1 - a.z0)));
   for (const a of adaylar) {
@@ -40,8 +41,13 @@ function inisYeri(world, o) {
       if (ofs === 0 && daireler.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + 36)) continue;
       if (Math.abs(ofs) > 0 && uzun / 2 - Math.abs(ofs) < 33) continue;
       if (engel(x, z, h, 70, 20)) continue;
-      return { x, z, h, saha: !!a.saha };
+      return { x, z, h, saha: !!a.saha, kind: a.saha ? "saha" : a.kind };
     }
+  }
+  // Wattenoog: saha/park/tarla açılmadan önce (360/560/300 sakin) kasabanın kenarında açık bir çayır.
+  if (DIL === "de") {
+    const m = world.placeOf?.("meydan")?.anchors?.[0] ?? [0, 0], c = acikAlan(world, m, { uz: 80, en: 30, rMin: 150, rMax: 800 });
+    if (c) return { x: c.x, z: c.z, h: c.h, saha: false, kind: "cimen" };
   }
   return null;
 }
@@ -135,10 +141,10 @@ export function buildZeplinOlay({ world, scene, zeplin }) {
     let nx = -az, nz = ax;
     if ((merkez[0] - yer.x) * nx + (merkez[1] - yer.z) * nz < 0) { nx = -nx; nz = -nz; }
     const kal = [yer.x + nx * 44, yer.z + nz * 44];
-    K.saha = yer.saha ? AD.saha : AD.yedekSaha;
+    K.saha = yer.saha ? AD.saha : DIL === "de" ? AD[yer.kind] ?? AD.yedekSaha : AD.yedekSaha; // de: Kurpark, Polder, Wiese
     // Kamera yönü: zeplinin geldiği uçtan çapraz (tam yandan uzak kamera tribün/binalara takılıyor, tam eksenden kuyruk
     // görünüyordu; seyircilerin karşı yanından); kadraj 2,6 kat uzak, 1,9 kat yüksek (çatıların üstünden).
-    return { odak: [yer.x, yer.z], odakY: 9, kalabalik: kal, kiyi: null, yon: Math.atan2(-ax * yon - nx * 0.8, -az * yon - nz * 0.8), yerAdi: K.saha.ad, zaman: null, gitD: 130, gitEgim: 0.42, cekimOlcek: 2.6, cekimOlcekH: 1.9, kalabalikArkadan: true };
+    return { odak: [yer.x, yer.z], odakY: 9, kalabalik: kal, kiyi: null, yon: Math.atan2(-ax * yon - nx * 0.8, -az * yon - nz * 0.8), yerAdi: DIL === "de" ? K.saha.Ad : K.saha.ad, zaman: null, gitD: 130, gitEgim: 0.42, cekimOlcek: 2.6, cekimOlcekH: 1.9, kalabalikArkadan: true };
   }
 
   function update(o, evre, minute, real, env) {
@@ -168,6 +174,14 @@ export function buildZeplinOlay({ world, scene, zeplin }) {
       if (sec < K.T.yer) return { kisa: `${Ad} is coming down!`, uzun: `At ${saatYaz(o.bas)} ${Z.ad} lost an engine, turned off its route and began descending toward ${Y.ad}.` };
       if (sec < K.T.kalk) return { kisa: `Blimp down on ${Y.ad}`, uzun: `At ${saatYaz(o.bas)} ${Z.ad} lost an engine and made an emergency landing on ${Y.ad}; nobody was hurt.${izle}` };
       return { kisa: `Blimp landing ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`, uzun: `At ${saatYaz(o.bas)} ${Z.ad} lost an engine and made an emergency landing on ${Y.ad}; nobody was hurt.${izle} It sat on the grass for ${kalis} minutes, got its engine turning again and took off.` };
+    }
+    if (DIL === "de") {
+      // Zeppelin-Notlandung (Wattenoog): eigener Zeppelin oder fremder Werbezeppelin.
+      const izle = n ? ` ${n} ${n === 1 ? "Schaulustiger kam" : "Schaulustige kamen"} an den Rand und sahen zu.` : "";
+      const der = K.kendi ? Z.ad : Z.der;
+      if (sec < K.T.yer) return { kisa: "Zeppelin im Sinkflug!", uzun: `Um ${saatYaz(o.bas)} ist ${Z.bei} ein Motor ausgefallen; er hat seine Route verlassen und sinkt ${Y.ziel} hinab.` };
+      if (sec < K.T.kalk) return { kisa: `Zeppelin gelandet: ${Y.Ad}`, uzun: `Um ${saatYaz(o.bas)} fiel ${Z.bei} ein Motor aus; er musste ${Y.auf} notlanden. Verletzt wurde niemand.${izle}` };
+      return { kisa: `Zeppelin-Notlandung ${o.yuva ? "heute Nachmittag" : "heute Vormittag"} · ${saatYaz(o.bas)}`, uzun: `Um ${saatYaz(o.bas)} fiel ${Z.bei} ein Motor aus; er landete ${Y.auf}, verletzt wurde niemand.${izle} Nach ${kalis} Minuten am Boden lief der Motor wieder, und der Zeppelin stieg auf.` };
     }
     const izle = n ? ` ${n} kişi alanın kenarına toplandı.` : "";
     if (sec < K.T.yer) return { kisa: "Zeplin alçalıyor!", uzun: `Saat ${saatte(o.bas)} ${Z.in} bir pervanesi durdu; zeplin rotasından çıkıp ${Y.ustune} alçalıyor.` };

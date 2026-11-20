@@ -195,6 +195,12 @@ const PROPS = {
   sosisli: () => merge([tint(new THREE.CapsuleGeometry(0.032, 0.15, 3, 8).rotateX(Math.PI / 2).translate(0, -0.03, 0.06), "#e3b46a"),
     tint(new THREE.CapsuleGeometry(0.02, 0.17, 3, 8).rotateX(Math.PI / 2).translate(0, -0.005, 0.06), "#b4442c"),
     tint(new THREE.BoxGeometry(0.012, 0.004, 0.14).translate(0, 0.016, 0.06), "#e8c22a")]),
+  // Fischbrötchen (Wattenoog marti olayı): yarık rundstück, arasından taşan gümüş-pembe ringa, marul, soğan halkası.
+  fischbrot: () => merge([tint(new THREE.SphereGeometry(0.05, 10, 6).scale(1, 0.55, 1.6).translate(0, -0.035, 0.06), "#d9a25a"),
+    tint(new THREE.SphereGeometry(0.05, 10, 6).scale(1, 0.45, 1.6).translate(0, 0.012, 0.06), "#e0ad66"),
+    tint(new THREE.CapsuleGeometry(0.018, 0.17, 3, 8).rotateX(Math.PI / 2).scale(1.5, 0.6, 1).translate(0, -0.012, 0.065), "#c9ccd2"),
+    tint(new THREE.BoxGeometry(0.11, 0.004, 0.14).translate(0, -0.004, 0.06), "#7cb342"),
+    tint(new THREE.TorusGeometry(0.022, 0.005, 4, 10).rotateX(Math.PI / 2).translate(0.02, -0.001, 0.04), "#f1ece0")]),
   mendil: () => merge([tint(new THREE.BoxGeometry(0.26, 0.24, 0.006).rotateZ(0.2).translate(0.02, 0.1, 0.02), "#d4202c")]),
   davul: () => merge([tint(new THREE.CylinderGeometry(0.27, 0.27, 0.3, 14).rotateZ(Math.PI / 2), "#c9a46a"),
     tint(new THREE.CylinderGeometry(0.275, 0.275, 0.02, 14).rotateZ(Math.PI / 2).translate(0.155, 0, 0), "#f2ead8"),
@@ -410,7 +416,7 @@ export class Crowd {
         }
         case "mat": this._prop("mat", this._joint(propM, root, 0, 0.01, 0.3)); break;
         // Olay eşyaları: simit/sosisli/mendil/klaket elde; zurna ağıza doğru; boom havaya; davul göğsün önünde.
-        case "simit": case "sosisli": case "mendil": case "klaket": this._prop(prop, this._joint(propM, handR, 0, -0.06, 0.03, -1.2)); break;
+        case "simit": case "sosisli": case "fischbrot": case "mendil": case "klaket": this._prop(prop, this._joint(propM, handR, 0, -0.06, 0.03, -1.2)); break;
         case "zurna": this._prop("zurna", this._joint(propM, handR, -0.03, -0.05, 0.04, -2.2)); break;
         case "boom": this._prop("boom", this._joint(propM, handR, 0, -0.04, 0, -2.6)); break;
         case "davul": this._prop("davul", this._joint(propM, torso, 0, 1.1, 0.3)); break;

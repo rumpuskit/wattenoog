@@ -280,3 +280,71 @@ export function yayaYeri(world, traffic, x, z) {
   if (traffic?.locate?.([x, z], 3.6, ["cadde", "sokak", "koy", "giris"])) return false;
   return true;
 }
+
+// ---------------------------------------------------------------- açık alan ve tur halkası (Wattenoog, 20 Kasım)
+
+/** Ağaç ve küçük engeller (ağaç, bank, lamba, çeşme, çöp kutusu…) merkezin r metre çevresinde: [x, z, yarıçap]. */
+export function engeller(world, merkez, r) {
+  const yakin = (x, z) => Math.hypot(x - merkez[0], z - merkez[1]) < r;
+  const out = [];
+  for (const t of world.trees ?? []) if (yakin(t.x, t.z)) out.push([t.x, t.z, 2.5]);
+  for (const f of world.features ?? []) if (f.x != null && yakin(f.x, f.z)) out.push([f.x, f.z, f.type === "agac" ? 2.5 : f.r ?? (f.type === "brunnen" || f.type === "cesme" ? 6 : 0.8)]);
+  for (const l of world.lamps ?? []) if (yakin(l.x, l.z)) out.push([l.x, l.z, 0.5]);
+  return out;
+}
+
+/** Merkez çevresinde engellerden (≥ pay m) uzak, yürünebilir kapalı halka: her açıda r0'dan rMax'a (sayı ya da açının işlevi)
+ *  ilk uygun yarıçap, sonra
+ *  komşuların en büyüğüyle yumuşatılır. icinde(x, z) verilirse halka onun içinde kalır. Dönüş: nokta dizisi ya da null. */
+export function turHalkasi(world, merkez, { r0, rMax, pay = 3, N = 72, icinde = null, ek = [] }) {
+  const E = [...engeller(world, merkez, (typeof rMax === "function" ? 200 : rMax) + 20), ...ek], rr = [];
+  for (let k = 0; k < N; k++) {
+    const a = (k / N) * Math.PI * 2, ra = typeof r0 === "function" ? r0(a) : r0, rm = typeof rMax === "function" ? rMax(a) : rMax;
+    let r = ra;
+    for (; r <= rm; r += 1) {
+      const x = merkez[0] + Math.cos(a) * r, z = merkez[1] + Math.sin(a) * r;
+      if (world.isWalkable?.(x, z) && !world.inCarriage?.(x, z) && (!icinde || icinde(x, z)) && !E.some(([ex, ez, er]) => Math.hypot(ex - x, ez - z) < er + pay)) break;
+    }
+    if (r > rm) return null;
+    rr.push(r);
+  }
+  const rs = rr.map((_, k) => Math.max(...[-3, -2, -1, 0, 1, 2, 3].map((d) => rr[(k + d + N) % N])));
+  const out = [];
+  for (let k = 0; k <= N; k++) { const a = (k / N) * Math.PI * 2, r = rs[k % N]; out.push([merkez[0] + Math.cos(a) * r, merkez[1] + Math.sin(a) * r]); }
+  return out;
+}
+
+/** Merkeze rMin–rMax uzaklıkta uz × en metrelik açık alan (çim; bina, ağaç, yol, su yok): { x, z, h } ya da null.
+ *  Zeplin/balon inişi için yedek (Wattenoog'da saha ve park açılmadan önce). Saf: aynı dünya hep aynı yeri verir. */
+export function acikAlan(world, merkez, { uz, en, rMin = 120, rMax = 700, adim = 30 }) {
+  const E = engeller(world, merkez, rMax + uz).filter(([, , r]) => r >= 2.5);
+  const binalar = world.buildings.filter((b) => Math.hypot(b.x - merkez[0], b.z - merkez[1]) < rMax + uz);
+  // Yol noktaları (her türden yol, toprak yol dahil; 4 m arayla): alan yolun üstüne düşmesin.
+  const yolN = [];
+  for (const e of world.network?.edges ?? []) for (let i = 1; i < e.pts.length; i++) {
+    const [ax, az] = e.pts[i - 1], [bx, bz] = e.pts[i], L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 4);
+    for (let j = 0; j <= n; j++) { const x = ax + ((bx - ax) * j) / n, z = az + ((bz - az) * j) / n; if (Math.hypot(x - merkez[0], z - merkez[1]) < rMax + uz) yolN.push([x, z]); }
+  }
+  for (let r = rMin; r <= rMax; r += adim) {
+    const n = Math.max(8, Math.round((2 * Math.PI * r) / adim));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2, x = merkez[0] + Math.sin(a) * r, z = merkez[1] + Math.cos(a) * r;
+      for (const h of [0, Math.PI / 2]) {
+        const c = Math.cos(h), s = Math.sin(h);
+        let ok = true, hMin = Infinity, hMax = -Infinity;
+        for (let u = -uz / 2; u <= uz / 2 && ok; u += 6) for (let v = -en / 2; v <= en / 2 && ok; v += 6) {
+          const px = x + c * u - s * v, pz = z + s * u + c * v;
+          if (!world.isWalkable?.(px, pz) || world.inCarriage?.(px, pz) || !(world.isLand?.(px, pz) ?? true)) ok = false;
+          const hh = world.height?.(px, pz) ?? 1; hMin = Math.min(hMin, hh); hMax = Math.max(hMax, hh);
+        }
+        // Düz ve kuru (kumul yamacı, set, bataklık kıyısı değil).
+        if (!ok || hMax - hMin > 1.2 || hMin < 1.0) continue;
+        if (E.some(([ex, ez, er]) => { const dx = ex - x, dz = ez - z, u = dx * c + dz * s, v = -dx * s + dz * c; return Math.abs(u) < uz / 2 + er + 4 && Math.abs(v) < en / 2 + er + 4; })) continue;
+        if (yolN.some(([ex, ez]) => { const dx = ex - x, dz = ez - z, u = dx * c + dz * s, v = -dx * s + dz * c; return Math.abs(u) < uz / 2 + 6 && Math.abs(v) < en / 2 + 6; })) continue;
+        if (binalar.some((b) => { const dx = b.x - x, dz = b.z - z, u = dx * c + dz * s, v = -dx * s + dz * c, br = Math.max(b.w ?? 6, b.d ?? 6) / 2; return Math.abs(u) < uz / 2 + br + 6 && Math.abs(v) < en / 2 + br + 6; })) continue;
+        return { x, z, h };
+      }
+    }
+  }
+  return null;
+}

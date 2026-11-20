@@ -9,10 +9,13 @@ import { DIL } from "./olay-ayar.js";
 import { roll } from "../sim.js";
 import { walkPose, resetPose } from "./people.js";
 import { kesir } from "./olay-plan.js";
-import { cizgi, agYolu, yumusat, temizle, enYakin, gorunum, tavirPoz, bisikletPoz, boya, birlestir, kutu, silindir, malzeme, yaziDoku, yayaYeri, clamp01, ease, aci, fark, lerp } from "./olay-yardim.js";
+import { engeller, turHalkasi, cizgi, agYolu, yumusat, temizle, enYakin, gorunum, tavirPoz, bisikletPoz, boya, birlestir, kutu, silindir, malzeme, yaziDoku, yayaYeri, clamp01, ease, aci, fark, lerp } from "./olay-yardim.js";
 
 // Evreler (olay-plan.js yaris ile aynı): hazirlik 0–0.15, yaris 0.15–0.8, bitis 0.8–1.
 const EY = 0.15, EB = 0.8;
+// Almanca trikot renkleri (RENKLER sırasıyla): [datif sıfat "im roten Trikot", yalın "das rote Trikot"].
+const RENK_DE = { "#c62828": ["roten", "rote"], "#1e5bc6": ["blauen", "blaue"], "#f2c230": ["gelben", "gelbe"], "#2e8b47": ["grünen", "grüne"],
+  "#ef7d22": ["orangen", "orange"], "#7b3fa6": ["lila", "lila"], "#f2f2ee": ["weißen", "weiße"], "#e86aa0": ["rosa", "rosa"] };
 const RENKLER = [["kırmızı", "red", "#c62828"], ["mavi", "blue", "#1e5bc6"], ["sarı", "yellow", "#f2c230"], ["yeşil", "green", "#2e8b47"],
   ["turuncu", "orange", "#ef7d22"], ["mor", "purple", "#7b3fa6"], ["beyaz", "white", "#f2f2ee"], ["pembe", "pink", "#e86aa0"]];
 
@@ -36,7 +39,7 @@ export function buildYarisOlay({ world, group, traffic }) {
     // Şişme takı: yarım simit (kırmızı), tepede iki yüzü yazılı pankart; kavşak bariyerleri; bitiş düzlüğünde demir bariyer.
     const tak = new THREE.Group();
     tak.add(new THREE.Mesh(birlestir([boya(new THREE.TorusGeometry(4.6, 0.55, 8, 28, Math.PI), "#d42a2a"), silindir(0.7, 0.8, 0.4, -4.6, 0.2, 0, "#2a2a2a", 10), silindir(0.7, 0.8, 0.4, 4.6, 0.2, 0, "#2a2a2a", 10)]), mat));
-    const yazilar = DIL === "en" ? ["FINISH", "START"] : ["BİTİŞ", "BAŞLANGIÇ"];
+    const yazilar = DIL === "en" ? ["FINISH", "START"] : DIL === "de" ? ["ZIEL", "START"] : ["BİTİŞ", "BAŞLANGIÇ"];
     for (const [k, s] of [[0, 1], [1, -1]]) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.0), new THREE.MeshStandardMaterial({ map: yaziDoku(yazilar[k], { zemin: "#ffffff", renk: "#c62828", w: 512, h: 116, font: "bold 78px sans-serif" }), roughness: 0.7 }));
       m.position.set(0, 4.55, s * 0.57); m.rotation.y = s > 0 ? 0 : Math.PI; tak.add(m);
@@ -45,7 +48,7 @@ export function buildYarisOlay({ world, group, traffic }) {
     g.add(tak);
     const bariyer = new THREE.InstancedMesh(birlestir([kutu(2.4, 0.22, 0.06, 0, 0.95, 0, "#e02020"), kutu(0.4, 0.22, 0.065, -0.8, 0.95, 0, "#ffffff"), kutu(0.4, 0.22, 0.065, 0, 0.95, 0, "#ffffff"), kutu(0.4, 0.22, 0.065, 0.8, 0.95, 0, "#ffffff"),
       kutu(0.07, 1.0, 0.07, -1.0, 0.5, 0, "#e8e8e8"), kutu(0.07, 1.0, 0.07, 1.0, 0.5, 0, "#e8e8e8"), kutu(0.5, 0.05, 0.5, -1.0, 0.03, 0, "#333"), kutu(0.5, 0.05, 0.5, 1.0, 0.03, 0, "#333")]), mat, 48);
-    const levhaM = new THREE.MeshStandardMaterial({ map: yaziDoku(DIL === "en" ? "ROAD CLOSED" : "YOL KAPALI", { zemin: "#ffffff", renk: "#c62828", w: 256, h: 64, font: "bold 40px sans-serif" }) });
+    const levhaM = new THREE.MeshStandardMaterial({ map: yaziDoku(DIL === "en" ? "ROAD CLOSED" : DIL === "de" ? "STRASSE GESPERRT" : "YOL KAPALI", { zemin: "#ffffff", renk: "#c62828", w: 256, h: 64, font: DIL === "de" ? "bold 27px sans-serif" : "bold 40px sans-serif" }) });
     const levha = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.3, 0.33).translate(0, 1.32, 0.05), levhaM, 48);
     const cit = new THREE.InstancedMesh(birlestir([kutu(2.0, 0.04, 0.04, 0, 1.05, 0, "#b8bcc2"), kutu(2.0, 0.04, 0.04, 0, 0.25, 0, "#b8bcc2"), ...[-0.6, -0.2, 0.2, 0.6].map((x) => kutu(0.025, 0.8, 0.025, x, 0.65, 0, "#b8bcc2")),
       kutu(0.05, 1.08, 0.05, -1.0, 0.54, 0, "#9ea2a8"), kutu(0.05, 1.08, 0.05, 1.0, 0.54, 0, "#9ea2a8"), kutu(0.06, 0.03, 0.7, -1.0, 0.02, 0, "#9ea2a8"), kutu(0.06, 0.03, 0.7, 1.0, 0.02, 0, "#9ea2a8")]), mat, 40);
@@ -60,6 +63,54 @@ export function buildYarisOlay({ world, group, traffic }) {
   function rota() {
     const merkez = world.placeOf?.("meydan")?.anchors?.[0] ?? [0, 0];
     const bando = (world.features ?? []).some((f) => f.type === "bandstand" && Math.hypot(f.x - merkez[0], f.z - merkez[1]) < 4);
+    if (DIL === "de") {
+      // Wattenoog: Volkslauf im Kurpark, Runden auf dem Rundweg um den Teich (autofrei; der Ring um den Marktplatz hat
+      // Parkstreifen: Läufer und Gitter liefen durch geparkte Autos). Start/Ziel-Bogen auf der Ostseite zum Ort hin.
+      // Kurpark (560 Einwohner) yoksa Marktplatz'ın üstünde, bankların ve ağaçların arasından bir tur.
+      const gol = world.places?.park ? (world.features ?? []).find((f) => f.type === "gol") : null;
+      const mp = (world.plazas ?? []).find((p) => p.kind === "meydan" && p.x0 != null);
+      if (!gol && !mp) return null;
+      const C = gol ? [gol.x, gol.z] : merkez;
+      const halka = gol ? turHalkasi(world, C, { r0: 54, rMax: 80, pay: 1.5, ek: [] })
+        : (() => {
+          // Platzrunde: yuvarlatılmış dikdörtgen (süperelips), lambaların (r 20) dışında, kenar ağaçlarının içinde.
+          const A = (mp.x1 - mp.x0) / 2 - 15, B = (mp.z1 - mp.z0) / 2 - 11, se = (a) => (Math.abs(Math.cos(a) / A) ** 4 + Math.abs(Math.sin(a) / B) ** 4) ** -0.25;
+          return turHalkasi(world, C, { r0: se, rMax: (a) => se(a) + 6, pay: 1.6, icinde: (x, z) => x > mp.x0 + 3 && x < mp.x1 - 3 && z > mp.z0 + 3 && z < mp.z1 - 3 });
+        })();
+      if (!halka) return null;
+      const tur = cizgi(yumusat(halka, 6, 4));
+      const gol2 = { x: C[0], z: C[1] };
+      const disari = (x, z, p) => Math.hypot(x - gol2.x, z - gol2.z) > Math.hypot(p.x - gol2.x, p.z - gol2.z);
+      const banklar = engeller(world, C, 120);
+      // Bogen: tercihen a0 yönünde (Kurpark: doğu, Ort tarafı; Marktplatz: doğu kenarı), ayakları (±4,6 m) ve bitiş düzlüğünün
+      // gitterleri (±22 m boyunca ±3,2 m) ağaç, lamba ve bankla çakışmayan yerde.
+      const a0 = gol ? 0.45 : 0, bos = (x, z, pay) => !banklar.some(([ex, ez, er]) => Math.hypot(ex - x, ez - z) < er + pay);
+      let t = null, enIyi = Infinity;
+      for (let s0 = 0; s0 < tur.len; s0 += 3) {
+        const p = tur.at(s0, {});
+        let ok = bos(p.x + p.nx * 4.6, p.z + p.nz * 4.6, 1.2) && bos(p.x - p.nx * 4.6, p.z - p.nz * 4.6, 1.2);
+        for (let d = -22; d <= 22 && ok; d += 2) { const q = tur.at((((s0 + d) % tur.len) + tur.len) % tur.len, {}); ok = bos(q.x + q.nx * 3.2, q.z + q.nz * 3.2, 0.6) && bos(q.x - q.nx * 3.2, q.z - q.nz * 3.2, 0.6); }
+        if (!ok) continue;
+        const da = Math.abs(Math.atan2(Math.sin(Math.atan2(p.z - C[1], p.x - C[0]) - a0), Math.cos(Math.atan2(p.z - C[1], p.x - C[0]) - a0)));
+        if (da < enIyi) { enIyi = da; t = { s: s0, x: p.x, z: p.z }; }
+      }
+      if (!t) { const a = enYakin(tur, C[0] + Math.cos(a0) * 60, C[1] + Math.sin(a0) * 60); t = { s: a.s, x: a.x, z: a.z }; }
+      // Duraklar: bitişin 10–40 m ilerisinde, rundweg'in dış yanında (çimde, bank ve ağaçtan uzak).
+      const durak = [];
+      for (let ileri = 10; ileri <= 44 && durak.length < 20; ileri += 2.6) for (const ic of [5.4, 7.6]) {
+        const p = tur.at((t.s + ileri) % tur.len, {});
+        for (const sg of [1, -1]) {
+          const x = p.x + p.nx * ic * sg, z = p.z + p.nz * ic * sg;
+          if (!disari(x, z, p) || durak.length >= 20 || !world.isWalkable?.(x, z)) continue;
+          if (banklar.some(([ex, ez, er]) => Math.hypot(ex - x, ez - z) < er + 1.2)) continue;
+          if (mp && !gol && !(x > mp.x0 + 2 && x < mp.x1 - 2 && z > mp.z0 + 2 && z < mp.z1 - 2)) continue;
+          durak.push([x, z]);
+        }
+      }
+      if (durak.length < 8) return null;
+      return { bisiklet: false, kenar: true, tak: [t.x, t.z], tur, turBas: t.s, turEksi: 0, giris: null, cikis: null, durak, merkez, ic: C,
+        ...(gol ? { ad: "Kurpark", strecke: "um den Kurparkteich", start: "im Kurpark" } : { ad: "Marktplatz", strecke: "über den Marktplatz", start: "am Marktplatz" }) };
+    }
     if (!bando && traffic?.lanes?.length) {
       // Mercanada: tak güney yaya caddesinde (meydandan 45 m), halka çevre yolu (güney → doğu → kuzey → batı).
       const ya = agYolu(world, [[merkez[0], merkez[1] + 30], [merkez[0], merkez[1] + 165]], ["yaya", "patika"]);
@@ -128,10 +179,12 @@ export function buildYarisOlay({ world, group, traffic }) {
     takKur();
     // Mercanada: halkadaki kavşaklar kapanır, yan sokak ağızlarına bariyer.
     K.dugum = new Set();
-    if (bis && traffic) bariyerKur();
+    if ((bis || R0.kapat) && traffic) bariyerKur();
     const tk = K.R.tak, ileri = K.R.giris ? K.R.giris.at(0, {}) : K.R.tur.at(K.R.turBas, {});
     // Seyircinin ortası: bitiş düzlüğünün kenarı (yolun ortası değil: kalabalık çekimi yarışçıların içinde kalıyordu).
-    const kal = [tk[0] + Math.sin(ileri.heading) * 10 + ileri.nx * (bis ? 6.5 : 5.5), tk[1] + Math.cos(ileri.heading) * 10 + ileri.nz * (bis ? 6.5 : 5.5)];
+    let kal = [tk[0] + Math.sin(ileri.heading) * 10 + ileri.nx * (bis ? 6.5 : 5.5), tk[1] + Math.cos(ileri.heading) * 10 + ileri.nz * (bis ? 6.5 : 5.5)];
+    // Halkanın içi kapalıysa (Kurpark: göl) seyirci dış yanda.
+    if (K.R.ic && Math.hypot(kal[0] - K.R.ic[0], kal[1] - K.R.ic[1]) < Math.hypot(tk[0] - K.R.ic[0], tk[1] - K.R.ic[1])) kal = [kal[0] - ileri.nx * 11, kal[1] - ileri.nz * 11];
     // Video (kaydet.mjs aracAni): önde gideni izleyen çekim otomatik saatte yarışın 4. dakikasında.
     const zaman = { lider: { yol: [Ts, Ts + 4.35] } };
     return { odak: tk.slice(), odakY: 1.3, kalabalik: kal, kiyi: null, yon: ileri.heading + 0.6, yerAdi: R0.ad, zaman, gitD: 44, gitEgim: 0.55 };
@@ -259,7 +312,7 @@ export function buildYarisOlay({ world, group, traffic }) {
   }
   /** Yol kapalıyken halkadaki gerçek trafik çizilmez (yarışçıların içinden geçmesin). */
   function gizle(x, z, minute) {
-    if (!K || !K.bis || minute < K.kapali[0] || minute >= K.kapali[1]) return false;
+    if (!K || !(K.bis || K.R.kapat) || minute < K.kapali[0] || minute >= K.kapali[1]) return false;
     return enYakin(K.R.tur, x, z, 8).d < 7.5 || (K.R.giris && enYakin(K.R.giris, x, z, 8).d < 6);
   }
 
@@ -267,7 +320,7 @@ export function buildYarisOlay({ world, group, traffic }) {
 
   /** Yol kenarında alkışlayanlar: yarış saatinde evinde olan, kapısı halkaya ≤ 30 m komşular kaldırıma çıkar. */
   function gorev(people, day, S, plans) {
-    if (!K || K.o !== S.plan || !K.bis) return [];
+    if (!K || K.o !== S.plan || !(K.bis || K.R.kapat || K.R.kenar)) return [];
     const R = people.residents, out = [], aday = [];
     const T0 = K.Ts + 1, T1 = K.Ts + K.sonT / 60;
     plans.forEach((plan, i) => {
@@ -403,6 +456,15 @@ export function buildYarisOlay({ world, group, traffic }) {
       }
       if (t < K.sonT + 30) return { kisa: `Yarışı ${R1[0]} formalı bisikletçi kazandı!`, uzun: `${n} bisikletçinin ${tur} tur attığı ada turu yarışında birinci ${R1[0]} formalı bisikletçi oldu (${dk(K.birinci.T)}). Şu ana dek ${bitti} bisikletçi bitişe ulaştı${sey ? `, ${sey} kişi bitişte alkışlıyor` : ""}.` };
       return { kisa: `Bugün ada turu bisiklet yarışı vardı · ${saatYaz(K.Ts)}`, uzun: `Saat ${saatte(K.Ts)} çarşıdan başlayan yarışta ${n} bisikletçi çevre yolunda ${tur} tur attı; birinciliği ${R1[0]} formalı bisikletçi aldı (${dk(K.birinci.T)}). Çevre yolu ${kapaliDk} dakika trafiğe kapalı kaldı${sey ? `, bitişte ${sey} kişi izledi` : ""}.` };
+    }
+    if (DIL === "de") {
+      // Volkslauf (Wattenoog): Läuferinnen und Läufer, Start/Ziel am Marktplatz.
+      const tr = (y) => RENK_DE[y.renk[2]] ?? ["bunten", "bunte"], uhr = saatYaz(K.Ts), km = String(Math.round(K.Ltop / 100) / 10).replace(".", ",");
+      const str = K.R.strecke ?? "durch den Ort", gesperrt = K.dugum?.size ? " Die Strecke ist für Autos gesperrt." : "";
+      if (t < 0) return { kisa: "Volkslauf: gleich geht's los!", uzun: `${n} Läuferinnen und Läufer stellen sich unter dem Startbogen ${K.R.start ?? "am Marktplatz"} auf. Start ist um ${uhr}: ${tur} Runden ${str}, zusammen ${km} km.${gesperrt}` };
+      if (t < K.birinci.T) { const ld = lider(minute); return { kisa: "Volkslauf im Ort!", uzun: `${n} Läuferinnen und Läufer drehen ${tur} Runden ${str}; vorn liegt gerade das ${tr(ld)[1]} Trikot.${K.kenarN ? " Anwohner feuern am Wegrand an." : ""}${sey && t > K.birinci.T - 600 ? ` Am Ziel warten ${sey} Zuschauer.` : ""}${gesperrt}` }; }
+      if (t < K.sonT + 30) return { kisa: `Sieg für das ${tr(K.birinci)[1]} Trikot!`, uzun: `Nach ${tur} Runden lief das ${tr(K.birinci)[1]} Trikot als Erstes durchs Ziel (${dk(K.birinci.T)}); ${bitti} von ${n} sind bisher angekommen${sey ? `, ${sey} Zuschauer klatschen` : ""}.` };
+      return { kisa: `Volkslauf ${o.yuva ? "heute Nachmittag" : "heute Vormittag"} · ${uhr}`, uzun: `Um ${uhr} gingen ${n} Läuferinnen und Läufer auf ${tur} Runden ${str} (${km} km); als Erstes im Ziel war das ${tr(K.birinci)[1]} Trikot (${dk(K.birinci.T)})${sey ? `, ${sey} Zuschauer feuerten sie an` : ""}.${K.dugum?.size ? ` Die Straßen waren ${kapaliDk} Minuten gesperrt.` : ""}` };
     }
     // Driftwood: fun run.
     if (!en) return null;

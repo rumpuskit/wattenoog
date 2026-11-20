@@ -27,11 +27,11 @@ const EXTRA_PLACES = { iskele_vapur: "Fähranleger", kiyi: "Am Ufer", kapi: "Vor
 const BUILDING_NAMES = { cami: "Inselkirche", liman: "Fähranleger", ambar: "Hafenspeicher", tersane: "Bootswerft", kulube: "Fischerhütte", ahir: "Bauernhof", itfaiye: "Feuerwehrhaus", garaj: "Bauhof", bufe: "Kiosk", carsi: "Laden in der Strandstraße" };
 // Olay türlerinin Almanca adı (olay-plan.js "en" İngilizce; o dosya üç adada ortak).
 const OLAY_AD = {
-  firtina: "den Sturm", sis: "den Nebel", yangin: "den Brand", kaza: "den Unfall", yunus: "die Delfine", balina: "den Wal",
+  firtina: "den Sturm", sis: "den Nebel", yangin: "den Brand", kaza: "den Unfall", yunus: "die Schweinswale", balina: "den Wal",
   zeplin: "die Notlandung des Zeppelins", dugun: "den Hochzeitskorso", fok: "die Seehunde", hortum: "die Wasserhose",
   gemi: "das Riesenschiff", moose: "den Elch", vapur: "die Fähre mit Panne", balik: "den Riesenfang", tekne_yarisi: "die Kutterregatta",
   kopekbaligi: "den Hai", kar: "den Schnee", elektrik: "den Stromausfall", balon: "die Heißluftballons", ucurtma: "das Drachenfest",
-  kus: "den Vogelschwarm", film: "die Dreharbeiten", yaris: "den Volkslauf", marti: "die Möwe mit dem Fischbrötchen",
+  kus: "die Ringelgänse", film: "die Dreharbeiten", yaris: "den Volkslauf", marti: "die Möwe mit dem Fischbrötchen",
 };
 /** Kat adı: zemin kat "Erdgeschoss", üstü "1. Stock". */
 const floorText = (f) => (f === 0 ? "Erdgeschoss" : `${ordinal(f)} Stock`);

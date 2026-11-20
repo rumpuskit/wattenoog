@@ -9,10 +9,17 @@ import * as THREE from "three";
 import { DIL, KUS } from "./olay-ayar.js";
 import { kesir } from "./olay-plan.js";
 import { adaylar, gorevler, yerlerSec, izleDurus, agaclar, agacTepe, pusula } from "./olay-izleyici.js";
+import { deichZ, southShoreZ, DEICH } from "./island.js";
+import { gelgitSeviye } from "./olay-kiyi.js";
+//   kaz (Wattenoog): bir Ringelgans sürüsü (40–80 küçük, koyu kaz: siyah baş ve boyun, beyaz boyun bandı, koyu gri-kahve
+//     sırt, beyaz kuyruk altı) batıdan Watt'ın üstünden gelir, setin önündeki tuzlu bataklığın (Salzwiese) üstünde geniş
+//     daireler çizer, küçük gruplar halinde iner, otlar, sonra hep birlikte havalanıp doğuya, Watt'ın üstünden uzaklaşır.
+//     Sakinler setin (Deich) tepesinden izler. Evreler olay-ayar.js KUS.evre: gelis, inis, otlama, gidis.
 
 const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 const clamp01 = (u) => Math.max(0, Math.min(1, u));
 const lerp = THREE.MathUtils.lerp;
+const MAT_K = new THREE.Matrix4();
 
 /** Renkli kutuları tek geometride birleştirir (yerel konum, boyut, renk, isteğe bağlı dönüş). */
 function birlestir(parcalar) {
@@ -178,6 +185,169 @@ export function buildKusOlay({ world, scene, group }) {
       n++;
     }
     for (const m of [G.govde, G.sag, G.sol]) { m.count = n; m.instanceMatrix.needsUpdate = true; }
+  }
+
+  // ------------------------------------------------------------------ kaz (Ringelgans)
+  function kazGorunum(N) {
+    if (G?.kaz && G.N >= N) return G;
+    if (G) group.remove(G.g);
+    const g = new THREE.Group(); group.add(g);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
+    // Gövde (+z ileri): koyu gri-kahve sırt, biraz açık yan/karın, beyaz kuyruk altı, siyah kuyruk.
+    const govde = birlestir([
+      { geo: new THREE.BoxGeometry(0.26, 0.2, 0.5), renk: "#3b3631" },
+      { geo: new THREE.BoxGeometry(0.27, 0.08, 0.42), pos: [0, -0.07, 0.02], renk: "#5f5951" },
+      { geo: new THREE.BoxGeometry(0.2, 0.13, 0.12), pos: [0, -0.02, -0.29], renk: "#f1efe9" },
+      { geo: new THREE.BoxGeometry(0.15, 0.05, 0.1), pos: [0, 0.05, -0.33], renk: "#151515" },
+    ]);
+    // Boyun ve baş (pivot boyun dibinde, +z ileri): siyah, beyaz boyun bandı, siyah gaga.
+    const boyun = birlestir([
+      { geo: new THREE.BoxGeometry(0.08, 0.08, 0.24), pos: [0, 0, 0.12], renk: "#151515" },
+      { geo: new THREE.BoxGeometry(0.088, 0.035, 0.05), pos: [0, 0.015, 0.15], renk: "#ecebe6" },
+      { geo: new THREE.BoxGeometry(0.09, 0.09, 0.12), pos: [0, 0.02, 0.28], renk: "#151515" },
+      { geo: new THREE.BoxGeometry(0.04, 0.035, 0.07), pos: [0, 0, 0.37], renk: "#0b0b0b" },
+    ]);
+    const bacak = birlestir([
+      { geo: new THREE.BoxGeometry(0.03, 0.18, 0.03), pos: [0.06, -0.09, 0], renk: "#121212" },
+      { geo: new THREE.BoxGeometry(0.03, 0.18, 0.03), pos: [-0.06, -0.09, 0], renk: "#121212" },
+    ]);
+    const kanatS = kanatGeo(0.62, 0.26, 0.17, "#3a3530", "#1b1916", 0), kanatL = kanatS.clone().scale(-1, 1, 1);
+    const inst = (geo) => { const m = new THREE.InstancedMesh(geo, mat, N); m.frustumCulled = false; m.count = 0; g.add(m); return m; };
+    G = { g, N, kaz: true, govde: inst(govde), boyun: inst(boyun), bacak: inst(bacak), sag: inst(kanatS), sol: inst(kanatL) };
+    return G;
+  }
+
+  function kazKur(o) {
+    // Yer: set anchorlarından kasabaya en yakın ikisinden biri (seyirci gelebilsin); setin önündeki tuzlu bataklık.
+    const an = (world.places?.deich?.anchors ?? []).slice().sort((a, b) => Math.abs(a[0]) - Math.abs(b[0])).slice(0, 2);
+    if (!an.length) return null;
+    const A = an[Math.floor(kesir("kazYer", o.tohum) * an.length)];
+    const x = A[0] + (kesir("kazX", o.tohum) - 0.5) * 80;
+    const zDz = deichZ(x), zToe = zDz + DEICH.taban / 2, zKiyi = southShoreZ(x);
+    const hT = Math.max(gelgitSeviye(o.day, o.bas + 0.3 * (o.son - o.bas)), gelgitSeviye(o.day, o.bas + 0.82 * (o.son - o.bas))) + 0.12;
+    // Yüksek suda (bataklık ıslak) sürü setin eteğine yakın iner: kuru kenar ve setin dış yamacı.
+    const C = [x, hT > 0.62 ? zToe + 5 : (zToe + 6 + zKiyi - 8) / 2], gC = gy(C[0], C[1]);
+    const N = 46 + (o.tohum % 31), t0 = o.bas * 60, t1 = o.son * 60, D = t1 - t0;
+    const sA = 100, sI = 0.2 * D, sK = 0.82 * D, R1 = 150, v = 13;
+    // Yerdeki yerler: bataklıkta (setin eteğiyle kıyı arası) 38 × 20 m elips; o saatin yüksek suyunun üstünde kuru (bahar
+    // gelgitinin yüksek suyu bataklığı ıslatır: o zaman setin dış yamacının alt kısmı da otlak sayılır).
+    const B = [];
+    for (let k = 0; B.length < N && k < N * 30; k++) {
+      const a = kesir("kazGa", o.tohum, k) * 6.283, r = Math.sqrt(kesir("kazGr", o.tohum, k));
+      const gx = C[0] + Math.cos(a) * r * 38, gz = C[1] + Math.sin(a) * r * 20;
+      if (gz < deichZ(gx) + DEICH.taban / 2 - 7 || gz > southShoreZ(gx) - 4 || (world.height?.(gx, gz) ?? 1) < Math.max(0.45, hT)) continue;
+      if (B.some((q) => Math.hypot(q.G[0] - gx, q.G[1] - gz) < 0.9)) continue;
+      const i = B.length, lat = (kesir("kazLat", o.tohum, i) - 0.5) * 36;
+      B.push({ G: [gx, gz], gY: gy(gx, gz), lat, lon: -Math.abs(lat) * 0.55 - kesir("kazLon", o.tohum, i) * 7, dy: (kesir("kazDy", o.tohum, i) - 0.5) * 4,
+        faz: kesir("kazF", o.tohum, i) * 6.28, f1: kesir("kazW1", o.tohum, i) * 6.28, f2: kesir("kazW2", o.tohum, i) * 6.28,
+        // İniş: 6–8'lik gruplar halinde (sıra numarasına göre), kalkış neredeyse birlikte (25 sn'lik dalga).
+        tl: sI + 25 + Math.floor(i / 7) * ((0.14 * D - 30) / Math.ceil(N / 7)) + kesir("kazTl", o.tohum, i) * 8,
+        tk: sK + kesir("kazTk", o.tohum, i) * 25 });
+    }
+    if (B.length < 20) return null;
+    const dirD = Math.atan2(1, 0.45); // gidiş: doğu-güneydoğu, Watt'ın üstünden
+    K = { o, tur: "kaz", C, gC, B, N: B.length, t0, t1, D, sA, sI, sK, R1, v, dirD, izleyen: 0, sedde: [C[0], zDz] };
+    kazGorunum(B.length);
+    G.g.visible = false;
+    // Kamera setin tepesinden bataklığa ve Watt'a (güneye) bakar.
+    return { odak: [C[0], C[1] + 30], odakY: 8, kalabalik: K.sedde, kiyi: null, yon: Math.atan2(0.25, -1), yerAdi: "Salzwiese am Deich", zaman: null,
+      gitD: 110, gitEgim: 0.22, gitCanli: true, cekimOlcek: 1.6, cekimOlcekH: 1.0, kalabalikArkadan: true };
+  }
+
+  /** Sürünün ortası (uçuşta): batıdan Watt'ın üstünden gelir (sA sn), sonra bataklığın güneyinde saat yönünde daire. */
+  const KF = { x: 0, y: 0, z: 0, yon: 0, yatis: 0 };
+  function kazSuru(s, out) {
+    const { C, R1, v, sA, gC } = K;
+    const cx = C[0] + 20 * Math.sin(s / 90), cz = C[1] + 55 + 14 * Math.cos(s / 70), w = -v / R1, th0 = Math.PI / 2;
+    if (s < sA) {
+      const ex = cx + R1 * Math.cos(th0), ez = cz + R1 * Math.sin(th0), d = (sA - s) * v;
+      out.x = ex - d; out.z = ez; out.y = gC + 34 + d * 0.006; out.yon = Math.PI / 2; out.yatis = 0;
+      return out;
+    }
+    const th = th0 + w * (s - sA);
+    out.x = cx + R1 * Math.cos(th); out.z = cz + R1 * Math.sin(th);
+    out.y = gC + 34 - 12 * ss01((s - sA) / (K.sI - sA + 1)) + 1.5 * Math.sin(s * 0.11);
+    out.yon = Math.atan2(-Math.sin(th) * w, Math.cos(th) * w); out.yatis = -0.22;
+    return out;
+  }
+  const ss01 = (u) => ease(clamp01(u));
+  /** Kaz i'nin pozu: p = { x, y, z, yon, egim, yatis, cirp (0 süzülme, 1 çırpma), yerde, boyun (rad), bacak, gor }. */
+  function kazPoz(b, sec, p) {
+    const s = sec - K.t0;
+    p.gor = false; p.yerde = false; p.bacak = false; p.boyun = 0; p.egim = 0; p.yatis = 0; p.cirp = 1;
+    if (s < 0) return p;
+    const ucus = (ss) => {
+      kazSuru(ss, KF);
+      const c = Math.cos(KF.yon), sn = Math.sin(KF.yon);
+      p.x = KF.x + b.lat * c + b.lon * sn; p.z = KF.z - b.lat * sn + b.lon * c; p.y = KF.y + b.dy + 1.2 * Math.sin(ss * 0.3 + b.faz);
+      p.yon = KF.yon; p.yatis = KF.yatis;
+    };
+    const a = 24;
+    if (s < b.tl - a) {
+      ucus(s);
+      p.gor = Math.hypot(p.x - K.C[0], p.z - K.C[1]) < 1500;
+      return p;
+    }
+    if (s < b.tl) {
+      // Süzülerek iniş: sürüdeki yerinden yerdeki yerine; son 3 sn kanat çırpıp frenler, bacaklar iner.
+      ucus(b.tl - a);
+      const u = (s - (b.tl - a)) / a, sx = p.x, sy = p.y, sz = p.z, gyb = b.gY + 0.27;
+      p.yon = Math.atan2(b.G[0] - sx, b.G[1] - sz);
+      p.x = sx + (b.G[0] - sx) * ease(u); p.z = sz + (b.G[1] - sz) * ease(u); p.y = gyb + (sy - gyb) * Math.pow(1 - u, 1.6);
+      p.cirp = u > 0.85 ? 1 : 0; p.egim = u > 0.85 ? 0.45 : -0.08; p.bacak = u > 0.7; p.yatis = 0; p.gor = true;
+      return p;
+    }
+    if (s < b.tk) {
+      // Otlama: yavaşça dolaşır (±2,5 m), çoğu zaman başı yerde, arada başını kaldırıp bakar.
+      const t = s - b.tl, e = ss01(t / 20);
+      const ox = Math.sin(t * 0.013 + b.f1) * 2.5 - Math.sin(b.f1) * 2.5, oz = Math.cos(t * 0.011 + b.f2) * 1.8 - Math.cos(b.f2) * 1.8;
+      p.x = b.G[0] + ox * e; p.z = b.G[1] + oz * e; p.y = b.gY + 0.27;
+      const dx = Math.cos(t * 0.013 + b.f1) * 0.0325, dz = -Math.sin(t * 0.011 + b.f2) * 0.0198;
+      p.yon = Math.atan2(dx, dz) + Math.sin(t * 0.07 + b.faz) * 0.3;
+      const per = 9 + 4 * b.faz / 6.28, k = (t + b.faz * 3) % per, yukari = k > per * 0.72;
+      p.boyun = yukari ? -0.9 : 0.62 + 0.1 * Math.sin(t * 5 + b.faz); p.egim = yukari ? 0 : -0.1; // otlarken gaga yerde
+      p.cirp = -1; p.yerde = true; p.bacak = true; p.gor = true;
+      return p;
+    }
+    // Kalkış: koşarak ve çırparak havalanır, doğu-güneydoğuya tırmanır; yanlara dağınık sürü toplanır.
+    const t = s - b.tk, dist = t < 5 ? 1.3 * t * t : 32.5 + 13 * (t - 5);
+    if (dist > 1600) return p;
+    const k = 1 - 0.55 * ss01(t / 30), dx = Math.sin(K.dirD), dz = Math.cos(K.dirD);
+    p.x = K.C[0] + (b.G[0] - K.C[0]) * k + dx * dist; p.z = K.C[1] + (b.G[1] - K.C[1]) * k + dz * dist;
+    p.y = b.gY + 0.27 + Math.min(45, 2.6 * t) + b.dy * ss01(t / 10);
+    p.yon = K.dirD; p.egim = t < 4 ? 0.35 : 0.05; p.bacak = t < 1.5; p.cirp = 1; p.gor = true;
+    return p;
+  }
+
+  const KZ = { x: 0, y: 0, z: 0, yon: 0, egim: 0, yatis: 0, cirp: 1, yerde: false, boyun: 0, bacak: false, gor: false };
+  function kazUpdate(sec) {
+    let n = 0, nb = 0;
+    const OL = 1.5; // okunurluk için %50 büyük
+    for (let i = 0; i < K.N; i++) {
+      const b = K.B[i];
+      kazPoz(b, sec, KZ);
+      if (!KZ.gor) continue;
+      E.set(-KZ.egim, KZ.yon, KZ.yatis, "YXZ");
+      Q.setFromEuler(E);
+      MB.compose(V.set(KZ.x, KZ.y, KZ.z), Q, S1.set(OL, OL, OL));
+      G.govde.setMatrixAt(n, MB);
+      G.boyun.setMatrixAt(n, MW.multiplyMatrices(MB, M.makeRotationX(KZ.boyun).setPosition(0, 0.05, 0.22)));
+      // Kanat: uçuşta sürekli çırpar (kazlar süzülmez), inişte açık ve sabit, yerde gövdeye katlı.
+      if (KZ.cirp < 0) {
+        const kat = M.makeRotationY(1.45); kat.setPosition(0.12, 0.06, 0.12);
+        G.sag.setMatrixAt(n, MW.multiplyMatrices(MB, kat).multiply(MAT_K.makeScale(0.55, 1, 1)));
+        const kat2 = M.makeRotationY(-1.45); kat2.setPosition(-0.12, 0.06, 0.12);
+        G.sol.setMatrixAt(n, MW.multiplyMatrices(MB, kat2).multiply(MAT_K.makeScale(0.55, 1, 1)));
+      } else {
+        const ac = KZ.cirp ? Math.sin(sec * 7.5 + b.faz) * 0.6 : 0.12;
+        G.sag.setMatrixAt(n, MW.multiplyMatrices(MB, M.makeRotationZ(ac).setPosition(0.12, 0.05, 0.05)));
+        G.sol.setMatrixAt(n, MW.multiplyMatrices(MB, M.makeRotationZ(-ac).setPosition(-0.12, 0.05, 0.05)));
+      }
+      if (KZ.bacak) G.bacak.setMatrixAt(nb++, MB); // bacak ucu gövde ortasının 0,27 m altında: yerde
+      n++;
+    }
+    for (const m of [G.govde, G.boyun, G.sag, G.sol]) { m.count = n; m.instanceMatrix.needsUpdate = true; }
+    G.bacak.count = nb; G.bacak.instanceMatrix.needsUpdate = true;
   }
 
   // ------------------------------------------------------------------ kartal
@@ -354,14 +524,14 @@ export function buildKusOlay({ world, scene, group }) {
   }
 
   // ------------------------------------------------------------------ ortak arayüz
-  function kur(o) { return TUR === "kartal" ? kartalKur(o) : leylekKur(o); }
+  function kur(o) { return TUR === "kartal" ? kartalKur(o) : TUR === "kaz" ? kazKur(o) : leylekKur(o); }
 
   function update(o, evre, minute) {
     if (!o || !K || K.o !== o) { if (G) G.g.visible = false; if (K && !o) K = null; return; }
     const sec = minute * 60, gor = sec >= K.t0 && sec <= K.t1;
     G.g.visible = gor;
     if (!gor) return;
-    if (K.tur === "leylek") leylekUpdate(sec); else kartalUpdate(sec);
+    if (K.tur === "leylek") leylekUpdate(sec); else if (K.tur === "kaz") kazUpdate(sec); else kartalUpdate(sec);
   }
 
   /** Hareketli hedef: leylekte termiğin ortası (sürünün o anki ortalama yüksekliği), ayrılışta sürünün ortası;
@@ -378,6 +548,12 @@ export function buildKusOlay({ world, scene, group }) {
     const sec = minute * 60;
     if (sec < K.t0 || sec > K.t1) return null;
     if (K.tur === "kartal") { kartalPoz(sec, KP); return [KP.x, KP.y + 0.3, KP.z]; }
+    if (K.tur === "kaz") {
+      // Görünen kazların ortası (her 3. kaz); yerdeyken bataklıktaki sürü.
+      let sx = 0, sy = 0, sz = 0, n = 0;
+      for (let i = 0; i < K.N; i += 3) { kazPoz(K.B[i], sec, KZ); if (KZ.gor) { sx += KZ.x; sy += KZ.y; sz += KZ.z; n++; } }
+      return n ? [sx / n, sy / n + 0.5, sz / n] : [K.C[0], K.gC + 1, K.C[1]];
+    }
     // Termiğe 500 m'den yakın kuşların ortası (uzaktan gelen ve giden uçlar ortalamayı kaydırmasın); yoksa öndeki grup.
     termik(sec, TC);
     const t0x = TC[0], t0z = TC[1];
@@ -401,6 +577,15 @@ export function buildKusOlay({ world, scene, group }) {
       const a = adaylar(people, day, plans, world, { T: T0, odak: K.kal, isR: 160, uzak: 1.4 });
       const y = yerlerSec(world, null, K.kal, [K.C[0], K.C[1]], Math.min(34, a.length), 0, 30, o.tohum, { kiyida: true, yay: 6.28, araliK: 1.2 });
       const g = gorevler(people, day, a, y, { T0, dagilim: 8, kal: [10, 22], Tson: o.son, modul: "kus", tavirlar: ["cek", "siper", "goster", "bak", "cek", "sasir"], tuz: "k" });
+      K.izleyen = g.length;
+      return g;
+    }
+    if (K.tur === "kaz") {
+      // Setin tepesinde (ve iç yamacının üst kısmında) bataklığa bakarak: geliş evresinin ortasından itibaren.
+      const T0 = o.bas + 0.08 * (o.son - o.bas);
+      const a = adaylar(people, day, plans, world, { T: T0, odak: K.sedde, isR: 320, uzak: 3, disari: true });
+      const y = yerlerSec(world, null, K.sedde, K.C, Math.min(26, a.length), 0, 9, o.tohum, { kiyida: true, yay: 3.0, araliK: 1.1 });
+      const g = gorevler(people, day, a, y, { T0, dagilim: 8, kal: [14, 26], Tson: o.son, modul: "kus", tavirlar: ["cek", "siper", "goster", "bak", "cek", "konus"], tuz: "k" });
       K.izleyen = g.length;
       return g;
     }
@@ -437,6 +622,16 @@ export function buildKusOlay({ world, scene, group }) {
       if (sec >= T.kon) u += ` It landed at the top of a tall tree on the shore to eat it.`;
       if (sec >= T.kalk + 10) u += ` After ${K.kalanDk} minutes in the tree it flew off to the ${gitYon}.`;
       const kisa = sec < T.su ? "A bald eagle over the bay!" : sec < T.kon ? "Eagle catches a fish!" : sec < T.kalk ? "Bald eagle in a tree by the water" : minute < o.son ? "The eagle flies off" : `Bald eagle ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`;
+      return { kisa, uzun: u + izle };
+    }
+    if (K.tur === "kaz") {
+      const s = sec - K.t0, ilkIn = Math.min(...K.B.map((b) => b.tl)), sonIn = Math.max(...K.B.map((b) => b.tl)), kalk = Math.min(...K.B.map((b) => b.tk));
+      const Y = (ss) => saatYaz((K.t0 + ss) / 60), gun = o.yuva ? "heute Nachmittag" : "heute Vormittag", bitti = minute >= o.son;
+      const izle = n ? ` ${n} ${n === 1 ? (bitti ? "Nachbar schaute" : "Nachbar schaut") : (bitti ? "Nachbarn schauten" : "Nachbarn schauen")} vom Deich aus zu.` : "";
+      let u = `Um ${saatYaz(o.bas)} kam ein Schwarm von ${K.N} Ringelgänsen aus dem Westen über das Watt und ${s < ilkIn ? "kreist" : "kreiste"} über der Salzwiese vor dem Deich.`;
+      if (s >= ilkIn) u += ` Ab ${Y(ilkIn)} ${s < sonIn ? "landen die Gänse in kleinen Gruppen" : "landeten die Gänse in kleinen Gruppen und fraßen das Gras der Salzwiese"}.`;
+      if (s >= kalk) u += ` Um ${Y(kalk)} flogen sie gemeinsam weiter Richtung Osten.`;
+      const kisa = s < ilkIn ? "Ringelgänse im Anflug!" : s < sonIn ? "Ringelgänse landen auf der Salzwiese" : s < kalk ? `${K.N} Ringelgänse auf der Salzwiese` : !bitti ? "Die Ringelgänse ziehen weiter" : `Ringelgänse ${gun} · ${saatYaz(o.bas)}`;
       return { kisa, uzun: u + izle };
     }
     const T1 = K.t0 + 0.15 * K.D, T2 = K.t0 + 0.72 * K.D;

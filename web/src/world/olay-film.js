@@ -35,7 +35,7 @@ export function buildFilmOlay({ world, group, traffic }) {
       kutu(0.3, 0.12, 0.06, -0.85, 1.0, 4.0, "#fff4cc"), kutu(0.3, 0.12, 0.06, 0.85, 1.0, 4.0, "#fff4cc"),
       ...tekerler(4.8, 2.1, 0.5),
     ]), mat));
-    const yaziM = new THREE.MeshStandardMaterial({ map: yaziDoku(DIL === "en" ? "FILM CREW" : "FİLM EKİBİ", { zemin: "#1f2c45", renk: "#ffd447", w: 1024, h: 256, font: "bold 150px sans-serif" }), roughness: 0.7 });
+    const yaziM = new THREE.MeshStandardMaterial({ map: yaziDoku(DIL === "en" ? "FILM CREW" : DIL === "de" ? "FILMTEAM" : "FİLM EKİBİ", { zemin: "#1f2c45", renk: "#ffd447", w: 1024, h: 256, font: "bold 150px sans-serif" }), roughness: 0.7 });
     for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.3), yaziM); m.position.set(s * 1.27, 2.3, -1.3); m.rotation.y = s * Math.PI / 2; kamyon.add(m); }
     g.add(kamyon);
     // Işık ayağı: üç ayak, direk, lamba kafası (ön yüzü ışıyan), kanatlar; ışıma sprite'ı (PointLight yok).
@@ -80,7 +80,7 @@ export function buildFilmOlay({ world, group, traffic }) {
     // Set bandı: direkler (InstancedMesh) ve sarı-siyah yazılı bant.
     const direk = new THREE.InstancedMesh(birlestir([silindir(0.035, 0.035, 1.0, 0, 0.5, 0, "#d8d8d8", 6), silindir(0.16, 0.18, 0.06, 0, 0.03, 0, "#2a2a2a", 8)]), mat, 40);
     direk.count = 0;
-    const bantDoku = yaziDoku(DIL === "en" ? "FILM SET · DO NOT CROSS" : "SET · GİRİLMEZ", { zemin: "#ffd31a", renk: "#111", w: 1024, h: 64, font: "bold 44px sans-serif" });
+    const bantDoku = yaziDoku(DIL === "en" ? "FILM SET · DO NOT CROSS" : DIL === "de" ? "DREHARBEITEN · BITTE NICHT BETRETEN" : "SET · GİRİLMEZ", { zemin: "#ffd31a", renk: "#111", w: DIL === "de" ? 1536 : 1024, h: 64, font: "bold 44px sans-serif" });
     bantDoku.wrapS = THREE.RepeatWrapping;
     g.add(direk);
     for (const m of [kamyon, vinc, reflektor, cadir, direk]) m.traverse?.((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
@@ -94,7 +94,7 @@ export function buildFilmOlay({ world, group, traffic }) {
   function yerlesim(o) {
     const merkez = world.placeOf?.("meydan")?.anchors?.[0] ?? [0, 0];
     const feat = (t) => (world.features ?? []).find((f) => f.type === t && Math.hypot(f.x - merkez[0], f.z - merkez[1]) < 4);
-    const bando = feat("bandstand"), cesme = feat("cesme");
+    const bando = feat("bandstand"), cesme = feat("cesme") ?? feat("brunnen"); // Wattenoog: Marktbrunnen
     let yonler, uzak, kamyonD;
     if (bando) { yonler = [[0, 1]]; uzak = 20; kamyonD = 57; } // Town Green: güney yarısı, kamyon Main Street'te
     else { yonler = [[0, 1], [1, 0], [0, -1], [-1, 0]]; uzak = cesme ? 12 : 8; kamyonD = 44; } // meydan: dört yaya caddesinden biri
@@ -111,7 +111,11 @@ export function buildFilmOlay({ world, group, traffic }) {
       } else { park = [merkez[0] + d[0] * kamyonD, merkez[1] + d[1] * kamyonD]; yol = f; }
       const noktalar = [L(0, 0), L(2.4, -11), L(2.4, 11), L(-11, 3.5), L(-5, -4.5), L(-5, 4.5), L(-12.4, -10.4), L(-14.4, 3.5), park];
       if (!noktalar.every(([x, z]) => world.isWalkable?.(x, z) && !world.inCarriage?.(x, z))) continue;
-      return { merkez, A, f, r, L, park, yol, bando: !!bando };
+      // Kamyonun geliş yolu (110 m) açık olmalı (Wattenoog: batıdan gelen kamyon Inselkirche'nin içinden geçiyordu).
+      let yolAcik = true;
+      for (let k = 0; k <= 110 && yolAcik; k += 3) { const x = park[0] - yol[0] * k, z = park[1] - yol[1] * k; if (!world.isWalkable?.(x, z) && !world.inCarriage?.(x, z)) yolAcik = false; }
+      if (!yolAcik) continue;
+      return { merkez, A, f, r, L, park, yol, bando: !!bando, cesme: !!cesme };
     }
     return null;
   }
@@ -166,7 +170,7 @@ export function buildFilmOlay({ world, group, traffic }) {
     ];
     gorsel();
     bantKur();
-    return { odak: L(-1, 0), odakY: 1.6, kalabalik: L(-19.5, 0), kiyi: null, yon: aci(-Y.f[0] - Y.r[0] * 0.55, -Y.f[1] - Y.r[1] * 0.55), yerAdi: Y.bando ? "Town Green" : "meydan", zaman: null, gitD: 46, gitEgim: 0.62, kalabalikArkadan: true };
+    return { odak: L(-1, 0), odakY: 1.6, kalabalik: L(-19.5, 0), kiyi: null, yon: aci(-Y.f[0] - Y.r[0] * 0.55, -Y.f[1] - Y.r[1] * 0.55), yerAdi: Y.bando ? "Town Green" : DIL === "de" ? "Marktplatz" : "meydan", zaman: null, gitD: 46, gitEgim: 0.62, kalabalikArkadan: true };
   }
 
   /** Bandı ve direkleri bugünkü yerleşime kurar. */
@@ -429,6 +433,15 @@ export function buildFilmOlay({ world, group, traffic }) {
       if (minute < K.Tc1) return { kisa: "Filming on " + yerAd + "!", uzun: `Two actors are shooting a scene in front of the ${arka} under the lights while the camera crane swings overhead${fN ? `; ${fN} neighbors are walking through the shot as extras` : ""}. The scene has been shot ${n} ${n === 1 ? "time" : "times"} so far${sey ? `, and ${sey} people are watching from behind the tape` : ""}.` };
       if (minute < o.son - 0.5) return { kisa: "Film crew packing up", uzun: `The film crew shot the same scene ${n} times in front of the ${arka}${fN ? ` with ${fN} neighbors as extras` : ""}; now they are packing up the lights and the crane.` };
       return { kisa: `Film shoot on ${yerAd} today · ${saatYaz(o.bas)}`, uzun: `A film crew taped off ${yerAd} from ${saatYaz(o.bas)} and shot the same scene ${n} times in front of the ${arka}${fN ? `; ${fN} neighbors walked through it as extras` : ""}${sey ? ` and ${sey} watched from behind the tape` : ""}. Then the crew packed up the lights and the crane and the truck backed out.` };
+    }
+    if (DIL === "de") {
+      // Küstenkrimi-Dreh auf dem Marktplatz (Wattenoog).
+      const vor = K.Y.cesme ? "vor dem Marktbrunnen" : "mitten auf dem Marktplatz", Vor = vor[0].toUpperCase() + vor.slice(1);
+      const fig = fN ? `${fN} ${fN === 1 ? "Nachbar läuft" : "Nachbarn laufen"} als Statisten durchs Bild` : "";
+      if (minute < K.Tc0) return { kisa: "Filmteam auf dem Marktplatz!", uzun: `Um ${saatYaz(o.bas)} ist der Lkw eines Filmteams am Marktplatz vorgefahren; die Crew baut Scheinwerfer und einen Kamerakran auf und hat den Platz ${vor} mit Flatterband abgesperrt. Gedreht wird ein Küstenkrimi.` };
+      if (minute < K.Tc1) return { kisa: "Krimi-Dreh auf dem Marktplatz!", uzun: `${Vor} spielen zwei Schauspieler unter den Scheinwerfern eine Szene für einen Küstenkrimi, der Kamerakran schwenkt über sie hinweg${fig ? `; ${fig}` : ""}. Die Szene wurde bisher ${n}-mal gedreht${sey ? `, ${sey} ${sey === 1 ? "Schaulustiger schaut" : "Schaulustige schauen"} hinter dem Absperrband zu` : ""}.` };
+      if (minute < o.son - 0.5) return { kisa: "Filmteam baut ab", uzun: `Das Filmteam hat dieselbe Szene ${vor} ${n}-mal gedreht${fN ? `, ${fN} ${fN === 1 ? "Nachbar war" : "Nachbarn waren"} als Statisten dabei` : ""}; jetzt werden Scheinwerfer und Kran abgebaut.` };
+      return { kisa: `Krimi-Dreh auf dem Marktplatz · ${saatYaz(o.bas)}`, uzun: `Ab ${saatYaz(o.bas)} hat ein Filmteam den Marktplatz abgesperrt und ${vor} dieselbe Szene für einen Küstenkrimi ${n}-mal gedreht${fN ? `; ${fN} ${fN === 1 ? "Nachbar spielte" : "Nachbarn spielten"} als Statisten mit` : ""}${sey ? `, ${sey} ${sey === 1 ? "Schaulustiger sah" : "Schaulustige sahen"} hinter dem Absperrband zu` : ""}. Danach packte die Crew Scheinwerfer und Kran ein, und der Lkw setzte rückwärts zurück.` };
     }
     const Yd = K.Y.bando ? "Town Green'de" : "Meydanda", Ye = K.Y.bando ? "Town Green'e" : "meydana";
     if (minute < K.Tc0) return { kisa: `${Yd} film ekibi!`, uzun: `Saat ${saatte(o.bas)} bir film ekibinin kamyonu ${Ye} geldi; ekip ışık ayaklarını ve kamera vincini kuruyor, ${arkaTr} önünü set bandıyla kapattı.` };

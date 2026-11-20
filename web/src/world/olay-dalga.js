@@ -8,7 +8,10 @@
 // noktası u'da tB = n·P + u·EGIK anında kırılır; açıktaki köpük şeritleri (gölgelendirici) aynı formülü kullanır.
 import * as THREE from "three";
 import { DIL } from "./olay-ayar.js";
-import { TAU, ss, mix, hr, kiyiYeri, kiyiAdi, vapurUzak, kopukHavuzu, gokKarart } from "./olay-kiyi.js";
+import { TAU, ss, mix, hr, kiyiYeri, kiyiAdi, vapurUzak, kopukHavuzu, gokKarart, gelgitSeviye, kuruKiyi, suCizgisi } from "./olay-kiyi.js";
+// Wattenoog (DIL "de"): Sturmflut am Hauptstrand. Gelgit: dalgalar o günün o saatindeki su çizgisinde kırılır (kumsalda su
+// çizgisi ~35 m oynar), deniz yüzeyi ve dalga duvarları o anki suyla iner/çıkar; seyirciler kuru kumda.
+const DE = DIL === "de";
 import { roll } from "../sim.js";
 
 const P = 8.5, C = 7, EGIK = 0.018; // dalga periyodu (sn), hızı (m/sn), kıyı boyunca kırılma kayması (sn/m)
@@ -82,7 +85,7 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
 
   function kur(o) {
     const yer = kiyiYeri(world, o, {
-      tuz: 7, kaynak: ["sahil_yolu", "kasaba", "iskele"],
+      tuz: 7, kaynak: DE ? ["plaj", "sahil_yolu"] : ["sahil_yolu", "kasaba", "iskele"],
       deniz: (W, e2, e1) => {
         if (vapurUzak(world, W[0], W[1]) < 70) return false;
         for (const la of [-YARI, 0, YARI]) if (world.height(W[0] + e1[0] * la + e2[0] * 40, W[1] + e1[1] * la + e2[1] * 40) > -1) return false;
@@ -91,12 +94,14 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
     });
     if (!yer) return null;
     hazirla();
-    const { W, e1, e2 } = yer, t = o.tohum | 0, Ts = (o.son - o.bas) * 60;
+    const hT = DE ? gelgitSeviye(o.day, (o.bas + o.son) / 2) : 0;
+    const { e1, e2 } = yer, t = o.tohum | 0, Ts = (o.son - o.bas) * 60;
+    const W = DE ? suCizgisi(world, yer.W, e2, hT) : yer.W;
     // Her parçanın su çizgisi (kıyı tam düz değil): kıyı boyunca u'da su kenarının v'si.
     const parca = [];
     for (let i = 0; i < G.n; i++) {
       const u = -YARI + i * ADIM, bx = W[0] + e1[0] * u, bz = W[1] + e1[1] * u;
-      const p = world.coastPoint(bx - e2[0] * 40, bz - e2[1] * 40, e2[0], e2[1], 0);
+      const p = DE ? suCizgisi(world, [bx, bz], e2, hT) : world.coastPoint(bx - e2[0] * 40, bz - e2[1] * 40, e2[0], e2[1], 0);
       const v0 = (p[0] - W[0]) * e2[0] + (p[1] - W[1]) * e2[1];
       parca.push({ u, v0: Math.abs(v0) < 30 ? v0 : 0, buyuk: 0 });
     }
@@ -105,7 +110,7 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
     for (let j = 0; j < MH; j++) for (let i = 0; i < MW; i++) {
       const u = ((i + 0.5) / MW - 0.5) * EN[0], v = ((j + 0.5) / MH) * EN[1];
       const x = W[0] + e1[0] * u + e2[0] * v, z = W[1] + e1[1] * u + e2[1] * v;
-      const h = world.height(x, z);
+      const h = world.height(x, z) - hT;
       mask[(j * MW + i) * 4] = h < -0.4 ? Math.round(255 * ss(-0.4, -1.6, h)) : 0;
       mask[(j * MW + i) * 4 + 3] = 255;
     }
@@ -150,7 +155,8 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
     G.bariyer.instanceMatrix.needsUpdate = G.ayak.instanceMatrix.needsUpdate = true;
     // Kapanış ve açılış: dövme evresinin başında (+1 dk), durulma evresinde (olay-plan.js dalga: yukselme 0,15, dovme 0,85).
     const kap = o.bas + (Ts * 0.15) / 60 + 1, ac = o.bas + (Ts * 0.9) / 60;
-    const kal = world.nearestWalkable(W[0] - e2[0] * 26, W[1] - e2[1] * 26, 8);
+    let kal = world.nearestWalkable(W[0] - e2[0] * 26, W[1] - e2[1] * 26, 8);
+    if (DE) kal = kuruKiyi(world, kal, e2, hT + 0.4);
     // Şeritteki iskeleler: dalga sırtı geçerken iki yanında su fışkırır ("dalgalar iskeleyi döver").
     const iskeleler = [];
     for (const pr of world.piers ?? []) {
@@ -161,12 +167,12 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
       if (v1 < 4) continue;
       iskeleler.push({ u, v0: Math.max(0, Math.min(...vs)), v1, en: Math.max(pr.x1 - pr.x0, pr.z1 - pr.z0) < 20 ? Math.min(pr.x1 - pr.x0, pr.z1 - pr.z0) / 2 + 0.8 : 3 });
     }
-    K = { o, yer, W, e1, e2, Ts, t, parca, kapali, iskeleler, bariyerler: bariyerler.slice(0, 4), kap, ac, kal, ad: kiyiAdi(world, yer, DIL), yaw, bos: new Set() };
+    K = { o, yer, W, hT, e1, e2, Ts, t, parca, kapali, iskeleler, bariyerler: bariyerler.slice(0, 4), kap, ac, kal, ad: kiyiAdi(world, yer, DIL), yaw, bos: new Set() };
     const odak = [W[0] + e2[0] * 4, W[1] + e2[1] * 4];
     // Kamera kıyı boyunca bakar (kiyi verilmez: video kamerası denizden ya da karanın içinden değil, sahil şeridinin
     // ilerisinden dalgaların kıyıyı dövdüğü çizgiye bakar; deniz bir yanda, sahil yolu öbür yanda).
     const sg = hr(t, 9) < 0.5 ? -1 : 1, yx = e1[0] * sg * 0.94 - e2[0] * 0.34, yz = e1[1] * sg * 0.94 - e2[1] * 0.34;
-    return { odak, odakY: 3, kalabalik: kal, kiyi: null, yon: Math.atan2(yx, yz), yerAdi: K.ad.ad, zaman: null,
+    return { odak, odakY: 3, kalabalik: kal, kiyi: null, yon: Math.atan2(yx, yz), yerAdi: DE ? K.ad.Ad : K.ad.ad, zaman: null,
       gitD: 80, gitEgim: 0.3, cekimOlcek: 1.25, kalabalikArkadan: true };
   }
 
@@ -187,6 +193,8 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
     uni.uT.value = ts; uni.uGuc.value = g; uni.uIsik.value = light;
     gokKarart(sky, scene, 0.55 * ss(0, 0.2, ts / K.Ts) * (1 - ss(0.85, 1, ts / K.Ts)), light, GRI);
     const { W, e1, e2 } = K, kp = G.kopuk, dm = G.duvar;
+    const tW = DE ? gelgitSeviye(o.day, minute) : 0; // o anki su seviyesi (deniz, duvarlar, su tozu)
+    G.deniz.position.y = 0.04 + tW;
     kp.bas(light);
     let nd = 0;
     const _m = MAT, ruz = 3.2; // rüzgâr karaya doğru (m/sn)
@@ -202,14 +210,14 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
         const bx = W[0] + e1[0] * u + e2[0] * (pc.v0 + vC), bz = W[1] + e1[1] * u + e2[1] * (pc.v0 + vC);
         // Kameranın dibindeki dalga duvarı çizilmez (alçak video kamerası kamanın içine düşüp kareyi yeşile boyuyordu).
         if (!cam || Math.hypot(cam.x - bx, cam.z - bz) > 9 || cam.y > h + 2) {
-          KOY(_m, bx, -0.3, bz, K.yaw, ADIM * 1.12, h, 1 + h * 0.9);
+          KOY(_m, bx, -0.3 + tW, bz, K.yaw, ADIM * 1.12, h, 1 + h * 0.9);
           dm.setMatrixAt(nd++, _m);
         }
         // Sırtta köpük (yığıldıkça artar).
         const kpk = ss(34, 4, vC) * g;
         if (kpk > 0.05) for (let j = 0; j < 2; j++) {
           const r = hr(K.t, i * 7 + j, nSon), s = 1.2 + 1.8 * kpk;
-          kp.ekle("puf", bx + e1[0] * (j - 0.5) * 2.4, h - 0.1, bz + e1[1] * (j - 0.5) * 2.4 - e2[1] * 0.1, s, s * 0.5, s, 0.95 * kpk * (0.7 + 0.3 * r));
+          kp.ekle("puf", bx + e1[0] * (j - 0.5) * 2.4, h - 0.1 + tW, bz + e1[1] * (j - 0.5) * 2.4 - e2[1] * 0.1, s, s * 0.5, s, 0.95 * kpk * (0.7 + 0.3 * r));
         }
       }
       // Kırılma: son kırılan dalganın su tozu ve köpüğü (6 sn).
@@ -224,7 +232,7 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
           const geri = (0.3 + (ruz * 0.5 + (bS ? 1.4 : 0)) * aj * (0.4 + 0.6 * r2)) * (0.7 + 0.5 * r1);
           const s = (0.75 + 0.4 * aj) * (bS ? 1.3 : 1) * (0.7 + 0.5 * r2);
           const al = 0.75 * (1 - ss(0.8, 4.8, aj)) * ss(0, 0.2, aj);
-          kp.ekle("puf", x0 + e1[0] * (r1 - 0.5) * 4 - e2[0] * geri, Math.max(0.4, y), z0 + e1[1] * (r1 - 0.5) * 4 - e2[1] * geri, s, s * 1.5, s, al);
+          kp.ekle("puf", x0 + e1[0] * (r1 - 0.5) * 4 - e2[0] * geri, Math.max(0.4, y) + tW, z0 + e1[1] * (r1 - 0.5) * 4 - e2[1] * geri, s, s * 1.5, s, al);
         }
         for (let j = 0; j < 10; j++) {
           const r1 = hr(tohum, j, 3), r2 = hr(tohum, j, 4), r3 = hr(tohum, j, 5), aj = a - 0.04 * j;
@@ -232,7 +240,7 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
           const vy = (6 + 7 * r2) * (bS ? 1.4 : 1) * Math.sqrt(HS / 2.1), y = vy * aj - 4.9 * aj * aj;
           if (y < 0) continue;
           const geri = (0.6 + 2 * r1 + ruz * 0.8) * aj, sz = 0.1 + 0.16 * r3;
-          kp.ekle("damla", x0 + e1[0] * (r3 - 0.5) * 6 - e2[0] * geri, y + 0.3, z0 + e1[1] * (r3 - 0.5) * 6 - e2[1] * geri, sz, sz * 1.5, sz);
+          kp.ekle("damla", x0 + e1[0] * (r3 - 0.5) * 6 - e2[0] * geri, y + 0.3 + tW, z0 + e1[1] * (r3 - 0.5) * 6 - e2[1] * geri, sz, sz * 1.5, sz);
         }
         // Kıyıya taşan köpük: kumsalda/rıhtımda, büyük dalgada daha içeride; yavaşça söner.
         const tas = (bS ? 9 : 4) * (HS / 2.1), al = 0.5 * ss(0, 0.6, a) * (1 - ss(2.5, 6.5, a)); // köpük kıyının hemen gerisine taşar (çimde beyaz lekeler yapmasın)
@@ -246,7 +254,7 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
       const bx = W[0] + e1[0] * is.u + e2[0] * vC, bz = W[1] + e1[1] * is.u + e2[1] * vC, n = Math.floor(ts / P);
       for (let j = 0; j < 6; j++) {
         const r1 = hr(K.t, 500 + j, n), r2 = hr(K.t, 520 + j, n), yan = j % 2 ? 1 : -1, s2 = (1.2 + 1.2 * r2) * g;
-        kp.ekle("puf", bx + e1[0] * yan * (is.en + 0.6 * r1) - e2[0] * j * 0.6, 1.2 + 2.6 * r2 * g, bz + e1[1] * yan * (is.en + 0.6 * r1) - e2[1] * j * 0.6, s2, s2 * 1.4, s2, 0.8 * g * (1 - j / 8));
+        kp.ekle("puf", bx + e1[0] * yan * (is.en + 0.6 * r1) - e2[0] * j * 0.6, 1.2 + 2.6 * r2 * g + tW, bz + e1[1] * yan * (is.en + 0.6 * r1) - e2[1] * j * 0.6, s2, s2 * 1.4, s2, 0.8 * g * (1 - j / 8));
       }
     }
     dm.count = nd; dm.instanceMatrix.needsUpdate = true;
@@ -307,6 +315,14 @@ export function buildDalgaOlay({ world, scene, group: olayGrubu, sky, traffic })
       if (u < 0.15) return { kisa: "The sea is building", uzun: `Since ${saatYaz(o.bas)} the wind has been whipping up the sea off ${A.ad}; whitecaps are rolling in and the waves are getting bigger.` };
       if (minute < K.ac) return { kisa: `Big waves pounding ${A.ad}`, uzun: `Big waves are crashing into ${A.ad} and throwing spray across the waterfront${yol ? "; the shore road is closed to traffic" : ""}. Everyone has stepped back from the water's edge.${izle}` };
       return { kisa: `Big waves ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`, uzun: `From ${saatYaz(o.bas)} big waves pounded ${A.ad}, throwing spray across the waterfront. Everyone stayed back from the water's edge for about ${kapSure} minutes${yol ? " and the shore road was closed" : ""}; by ${saatYaz(o.son)} the sea had calmed down.${n ? ` ${n} ${n === 1 ? "neighbor" : "neighbors"} watched from a safe distance.` : ""}` };
+    }
+    if (DE) {
+      const gun = o.yuva ? "heute Nachmittag" : "heute Vormittag";
+      const izle = (pr) => (n ? ` ${n} ${n === 1 ? (pr ? "Nachbar schaut" : "Nachbar sah") : (pr ? "Nachbarn schauen" : "Nachbarn sahen")} aus sicherer Entfernung zu.` : "");
+      const yolT = yol ? (K.polis ? "; die Uferstraße ist gesperrt, die Polizei steht an der Absperrung" : "; die Uferstraße ist gesperrt") : "";
+      if (u < 0.15) return { kisa: "Sturmflut: Das Wasser steigt", uzun: `Seit ${saatYaz(o.bas)} peitscht der Sturm die See ${A.vor} auf; Schaumkronen rollen heran, die Wellen werden immer höher.` };
+      if (minute < K.ac) return { kisa: `Sturmflut ${A.an} · Strand gesperrt`, uzun: `Hohe Wellen rollen ${A.an} weit den Sand hinauf, die Gischt fliegt meterweit landeinwärts. Der Strand ist geräumt, alle halten Abstand zum Wasser${yolT}.${izle(true)}` };
+      return { kisa: `Sturmflut ${gun} · ${saatYaz(o.bas)}`, uzun: `Ab ${saatYaz(o.bas)} rollten hohe Wellen ${A.an} weit den Sand hinauf. Rund ${kapSure} Minuten blieb der Strand geräumt${yol ? " und die Uferstraße gesperrt" : ""}; um ${saatYaz(o.son)} hatte sich die See beruhigt. Verletzt wurde niemand.${izle(false)}` };
     }
     const izle = n ? ` ${n} kişi güvenli mesafeden izliyor.` : "";
     const polis = K.polis ? `; polis bariyer başında` : "";

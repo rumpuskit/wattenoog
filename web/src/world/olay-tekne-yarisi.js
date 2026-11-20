@@ -9,12 +9,27 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { DIL } from "./olay-ayar.js";
 import { isOpen } from "../sim.js";
-import { istakozTeknesi, kopukHavuzu, tekneIzi, birlestir, TEKNE_MAT, ease, clamp01, lerp } from "./olay-tekne.js";
+import { istakozTeknesi, krabbenkutter, kopukHavuzu, tekneIzi, birlestir, TEKNE_MAT, ease, clamp01, lerp } from "./olay-tekne.js";
 import { colored } from "./harbor.js";
+import { promenadeZ } from "./island.js";
+import { tide } from "./gelgit.js";
 
 const EN = DIL === "en";
+// Wattenoog (Almanca): Kutterregatta. Beş Krabbenkutter (ağ kolları kalkık) Hauptstrand'ın önünde, şamandıra hattının
+// ötesindeki açık denizde (Watt değil: gelgitten bağımsız derin su) iki dönüş şamandırası çevresinde BİR tur yarışır
+// (kutter ~11 kn); seyirciler kumsalda yüksek su çizgisinin gerisinde. Parkur iç uzayda kurulur, dünyaya kuzeye
+// aynalanır (za çevresinde: deniz −z).
+const DE = DIL === "de";
+const TUR = DE ? 1 : 3;
 /** Yarışan tekneler: numara, ad, gövde/şerit rengi, renk adı (metin). Sıra = şerit (iç → dış). */
-export const TEKNELER = [
+const TEKNELER_DE = [
+  { no: 7, ad: "Gesine", govde: "#1f3f5f", serit: "#f4f1ea", renk: ["", "blaue"] },
+  { no: 12, ad: "Seestern", govde: "#7a1f1f", serit: "#f4f1ea", renk: ["", "rote"] },
+  { no: 3, ad: "Hoffnung", govde: "#2b4a35", serit: "#f2d36b", renk: ["", "grüne"] },
+  { no: 21, ad: "Anna Maria", govde: "#f4f1ea", serit: "#1f3f5f", renk: ["", "weiße"] },
+  { no: 9, ad: "Möwe", govde: "#23272d", serit: "#e2b72e", renk: ["", "schwarze"] },
+];
+export const TEKNELER = DE ? TEKNELER_DE : [
   { no: 7, ad: "Miss Ellie", govde: "#c8352a", serit: "#f4f1ea", renk: ["kırmızı", "red"] },
   { no: 12, ad: "Sea Smoke", govde: "#2f7a4a", serit: "#f4f1ea", renk: ["yeşil", "green"] },
   { no: 3, ad: "Lady Grace", govde: "#24406e", serit: "#e2b72e", renk: ["lacivert", "navy"] },
@@ -32,7 +47,7 @@ function atlas() {
   TEKNELER.forEach((t, i) => {
     g.fillStyle = "#f7f6f2"; g.fillRect(i * W, 0, W, H);
     g.fillStyle = "#15181d"; g.textAlign = "center"; g.textBaseline = "middle";
-    g.font = "bold 92px sans-serif"; g.fillText(String(t.no), i * W + W / 2, H * 0.4);
+    g.font = "bold 92px sans-serif"; g.fillText(DE ? `WAT ${t.no}` : String(t.no), i * W + W / 2, H * 0.4);
     g.font = "bold 22px sans-serif"; g.fillText(t.ad.toUpperCase(), i * W + W / 2, H * 0.86);
   });
   const tx = new THREE.CanvasTexture(c); tx.anisotropy = 4;
@@ -53,7 +68,7 @@ export function buildTekneYarisiOlay({ world, scene }) {
     const group = new THREE.Group(); group.name = "olay-yaris"; scene.add(group);
     const tex = atlas(), lmat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 });
     const tekneler = TEKNELER.map((t, i) => {
-      const T = istakozTeknesi(BOY, t.govde, t.serit, "#f6f4ee"), k = T.kosk, g = new THREE.Group();
+      const T = DE ? krabbenkutter(BOY, t.govde, t.serit) : istakozTeknesi(BOY, t.govde, t.serit, "#f6f4ee"), k = T.kosk, g = new THREE.Group();
       g.add(T.mesh);
       // Numara levhaları: köşkün iki yanında ve çatısında.
       const zc = (k.z0 + k.z1) / 2, lw = (k.z1 - k.z0) * 0.86, lh = k.ch * 0.42, y = k.cy + k.ch * 0.27;
@@ -105,8 +120,13 @@ export function buildTekneYarisiOlay({ world, scene }) {
     return out;
   };
 
-  /** Teknenin (i) olayın sn'sindeki duruşu; görünmüyorsa null. */
+  /** Teknenin (i) olayın sn'sindeki duruşu; görünmüyorsa null. Wattenoog: iç uzaydan dünyaya ayna (z → 2·za − z). */
   function poz(i, sn, out) {
+    const r = pozIc(i, sn, out);
+    if (r && K.ayna) { r.z = 2 * K.P.za - r.z; r.h = Math.PI - r.h; }
+    return r;
+  }
+  function pozIc(i, sn, out) {
     if (!K) return null;
     const P = K.P, d = P.seritler[i], gel = K.gelis[i];
     const startXZ = [P.xs, P.za - d];
@@ -157,14 +177,24 @@ export function buildTekneYarisiOlay({ world, scene }) {
     G ??= geoKur();
     // Seyir yeri: balık iskelesi (açıksa), yoksa koyun iskelesi; bitiş çizgisi onun önünde.
     const bi = world.piers.find((p) => p._k === "balik_iskelesi");
-    const acik = !!bi && isOpen("balik_iskelesi");
-    const iskele = acik ? { x: (bi.x0 + bi.x1) / 2, z1: bi.z1, z0: bi.z0, ad: ["Balık İskelesi", "the Fishing Pier"] } : { x: koy.jetty.x, z1: koy.jetty.z1, z0: koy.jetty.z0, ad: ["Balıkçı Koyu iskelesi", "the Fishing Wharf"] };
-    const xf = acik ? iskele.x : koy.jetty.x + 90;
-    const za = iskele.z1 + 36, r = 30;
+    const acik = !DE && !!bi && isOpen("balik_iskelesi");
+    let iskele = acik ? { x: (bi.x0 + bi.x1) / 2, z1: bi.z1, z0: bi.z0, ad: ["Balık İskelesi", "the Fishing Pier"] } : { x: koy.jetty.x, z1: koy.jetty.z1, z0: koy.jetty.z0, ad: ["Balıkçı Koyu iskelesi", "the Fishing Wharf"] };
+    let xf = acik ? iskele.x : koy.jetty.x + 90;
+    let za = iskele.z1 + 36;
+    const r = 30;
+    let kal = [iskele.x, iskele.z1 - 6];
+    if (DE) {
+      // Hauptstrand'ın önü: iç düzlük ortalama su çizgisinden 115 m açıkta (Badebereich şamandıraları 45 m'de).
+      xf = 0;
+      za = world.coastPoint(xf, promenadeZ(xf), 0, -1, -115)[1];
+      const k = world.coastPoint(xf + 20, promenadeZ(xf + 20), 0, -1, 40); // yüksek su çizgisinin (≈35 m) gerisi
+      kal = k;
+      iskele = { x: xf, z1: za, z0: za, ad: ["", "Hauptstrand"] };
+    }
     const xw = xf - 120, xe = xf + 120, xs = xw + 20;
     const lap = 2 * (xe - xw) + 2 * Math.PI * r;
-    const s0 = xs - xw, Lr = 3 * lap + (xf - xs), Dpost = lap - 50;
-    const seritler = [-12, -6, 0, 6, 12];
+    const s0 = xs - xw, Lr = TUR * lap + (xf - xs), Dpost = lap - 50;
+    const seritler = DE ? [-16, -8, 0, 8, 16] : [-12, -6, 0, 6, 12]; // Wattenoog: Ausleger iki yana ~4 m taşar
     // Kazanan ve bitiş süreleri (tohum): kazanan 132–140 sn (~15 m/sn); diğerleri 1,2–9 sn arkada.
     const h = (k) => ((o.tohum >>> (k * 3)) % 997) / 997;
     const sira = [0, 1, 2, 3, 4].sort((a, b) => h(a + 2) - h(b + 2));
@@ -179,11 +209,12 @@ export function buildTekneYarisiOlay({ world, scene }) {
     }
     const gelis = TEKNELER.map((_, i) => (4 + 1.3 * i) * 60);
     const uzak = TEKNELER.map((_, i) => [xw - 650 - 60 * i, za + 1350 + 50 * i]);
-    K = { o, P: { xw, xe, xs, xf, za, zb: za + 2 * r, zc: za + r, r, lap, s0, Lr, Dpost, seritler, vBitis }, kazanan, bitis, dalga, dalgaK, gelis, uzak, donutC: [xf, za + 46], iskele };
-    G.donus.position.set(xe, 0.15, za + r); G.donus2.position.set(xw, 0.15, za + r);
-    G.bitis.position.set(xf, 0.12, za - 22); G.bitis2.position.set(xf, 0.12, za + 18);
-    const kal = [iskele.x, iskele.z1 - 6];
-    return { odak: [(xw + xe) / 2, za + r], odakY: 1.5, kalabalik: kal, kiyi: null, yon: Math.atan2(0.3, 1), yerAdi: iskele.ad[EN ? 1 : 0], zaman: null,
+    K = { o, P: { xw, xe, xs, xf, za, zb: za + 2 * r, zc: za + r, r, lap, s0, Lr, Dpost, seritler, vBitis }, kazanan, bitis, dalga, dalgaK, gelis, uzak, donutC: [xf, za + 46], iskele, ayna: DE };
+    const az = (z) => (DE ? 2 * za - z : z); // dünyaya ayna
+    G.donus.position.set(xe, 0.15, az(za + r)); G.donus2.position.set(xw, 0.15, az(za + r));
+    G.bitis.position.set(xf, 0.12, az(za - (DE ? 26 : 22))); G.bitis2.position.set(xf, 0.12, az(za + (DE ? 24 : 18)));
+    K.samY = [G.donus, G.donus2, G.bitis, G.bitis2].map((m) => m.position.y);
+    return { odak: [(xw + xe) / 2, az(za + r)], odakY: 1.5, kalabalik: kal, kiyi: null, yon: DE ? Math.atan2(0.3, -1) : Math.atan2(0.3, 1), yerAdi: iskele.ad[EN || DE ? 1 : 0], zaman: null,
       gitD: 210, gitEgim: 0.4, cekimOlcek: 1.1, cekimOlcekH: 1.0, kalabalikArkadan: true };
   }
   function yarisEgriHam(u, w, k) {
@@ -206,14 +237,15 @@ export function buildTekneYarisiOlay({ world, scene }) {
       // Hızla pruva kalkar (yarışta), dönüşte yatar.
       const yaris = sn > START && sn < START + K.bitis[i] + 20;
       const kalk = yaris ? 0.07 : 0.01;
-      g.position.set(p.x, 0.1 + 0.05 * Math.sin(real * 1.4 + i), p.z);
+      g.position.set(p.x, 0.1 + 0.05 * Math.sin(real * 1.4 + i) + (DE ? tide() : 0), p.z);
       g.rotation.set(-kalk + 0.015 * Math.sin(real * 1.1 + i), p.h, (yaris ? 0.05 : 0.015) * Math.sin(real * 0.9 + i * 2), "YXZ");
-      tekneIzi(G.kop, (s, out) => poz(i, s, out), sn, { boy: BOY, en: BOY * 0.34, hiz0: 9, n: 14, dt: 0.7, guc: 1 });
+      tekneIzi(G.kop, (s, out) => poz(i, s, out), sn, { boy: BOY, en: BOY * 0.34, hiz0: DE ? 5.5 : 9, n: 14, dt: 0.7, guc: 1 });
     }
     G.kop.bitir(env?.light ?? 1);
     // Şamandıralar yalnız toplanmadan kutlamanın sonuna dek.
     const sam = sn > 60 && sn < AYRIL;
     G.donus.visible = G.donus2.visible = G.bitis.visible = G.bitis2.visible = sam;
+    if (DE) [G.donus, G.donus2, G.bitis, G.bitis2].forEach((m, k) => { m.position.y = K.samY[k] + tide(); });
   }
 
   /** Video: yarışta öndeki tekne, öncesinde start çizgisi, sonra kazanan. */
@@ -221,7 +253,7 @@ export function buildTekneYarisiOlay({ world, scene }) {
     if (!K) return null;
     const sn = (minute - K.o.bas) * 60;
     if (sn < 0 || sn > (K.o.son - K.o.bas) * 60) return null;
-    if (sn < START) return [K.P.xs, 1.5, K.P.za];
+    if (sn < START) return [K.P.xs, 1.5 + (DE ? tide() : 0), K.P.za];
     let en = -1, sMax = -1;
     for (let i = 0; i < N; i++) {
       const tau = sn - START, F = K.bitis[i];
@@ -230,7 +262,7 @@ export function buildTekneYarisiOlay({ world, scene }) {
     }
     if (sn > START + K.bitis[K.kazanan]) en = K.kazanan;
     const p = poz(en, sn, _o);
-    return p ? [p.x, 1.5, p.z] : [K.P.xf, 1.5, K.P.za];
+    return p ? [p.x, 1.5 + (DE ? tide() : 0), p.z] : [K.P.xf, 1.5, K.P.za];
   }
 
   /** Ses: yarışta ve bitişte kalabalık uğultusu. */
@@ -246,6 +278,13 @@ export function buildTekneYarisiOlay({ world, scene }) {
     const bitDk = o.bas + (START + K.bitis[K.kazanan]) / 60, ikinci = TEKNELER[[0, 1, 2, 3, 4].sort((a, b) => K.bitis[a] - K.bitis[b])[1]];
     const fark = Math.round(K.bitis[[0, 1, 2, 3, 4].sort((a, b) => K.bitis[a] - K.bitis[b])[1]] - K.bitis[K.kazanan]);
     const yer = K.iskele.ad[EN ? 1 : 0];
+    if (DE) {
+      const st = saatYaz(o.bas + START / 60);
+      const izle = n ? (n === 1 ? " Eine Person feuerte vom Strand aus an." : ` ${n} Schaulustige feuerten vom Strand aus an.`) : "";
+      if (sn < START) return { kisa: "Heute Kutterregatta!", uzun: `Fünf Krabbenkutter stellen sich vor dem Hauptstrand zur Regatta auf: eine Runde um zwei Tonnen, Ziel zwischen den gelben Tonnen vor dem Strand. Start um ${st}.` };
+      if (sn < START + K.bitis[K.kazanan]) return { kisa: "Kutterregatta läuft!", uzun: `Um ${st} sind fünf Krabbenkutter vor dem Hauptstrand gestartet: eine Runde um zwei Tonnen, mit Gischt am Bug.` };
+      return { kisa: `WAT ${W.no} „${W.ad}“ gewinnt die Kutterregatta · ${saatYaz(bitDk)}`, uzun: `Um ${st} fuhren fünf Krabbenkutter vor dem Hauptstrand eine Runde um zwei Tonnen. Die ${W.renk[1]} „${W.ad}“ (WAT ${W.no}) ging um ${saatYaz(bitDk)} als Erste durchs Ziel, ${fark} ${fark === 1 ? "Sekunde" : "Sekunden"} vor der „${ikinci.ad}“ (WAT ${ikinci.no}).${izle}${sn >= DONUT0 && sn < AYRIL ? " Die Siegerin dreht vor dem Strand Ehrenrunden." : ""}` };
+    }
     if (EN) {
       const izle = n ? ` ${n} ${n === 1 ? "neighbor" : "neighbors"} cheered from the pier.` : "";
       if (sn < START) return { kisa: "Lobster boat race today!", uzun: `Five lobster boats are lining up off ${yer} for a race: three laps around two buoys, finish line off the end of the pier. Start at ${saatYaz(o.bas + START / 60)}.` };

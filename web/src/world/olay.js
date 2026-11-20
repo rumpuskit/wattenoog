@@ -22,6 +22,9 @@ import { buildDeniz } from "./deniz.js";
 import { idleGesture } from "./people.js";
 import { pointAt } from "./traffic.js";
 import { MODULLER } from "./olay-moduller.js";
+import { DIL } from "./olay-ayar.js";
+import { kiyiAdi } from "./olay-kiyi.js";
+import { clockText } from "../fmt.js";
 
 const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 const clamp01 = (u) => Math.max(0, Math.min(1, u));
@@ -140,6 +143,13 @@ export function buildOlay({ world, scene, sky, params, traffic, zeplin = null, y
     } else if (o.tur === "yunus" || o.tur === "balina") {
       const y = deniz.yerSec(o);
       if (y) { S.odak = y.deniz; S.kiyi = y.kiyi; S.kalabalik = y.kiyi; S.odakY = 0.5; S.yon = yon(y.kiyi[0] - y.deniz[0], y.kiyi[1] - y.deniz[1]); }
+      // Almanca yer adı (Wattenoog): "vor dem Hauptstrand" (yazi), yerAdi "Hauptstrand".
+      if (y && DIL === "de") {
+        const e2 = [y.deniz[0] - y.kiyi[0], y.deniz[1] - y.kiyi[1]], l = Math.hypot(...e2) || 1;
+        S.yerDe = y.ad === "fener" ? { ad: "der Leuchtturm Westkopf", Ad: "Leuchtturm Westkopf", vor: "vor dem Leuchtturm Westkopf", an: "am Leuchtturm Westkopf" }
+          : kiyiAdi(world, { ad: y.ad, W: y.kiyi, e2: [e2[0] / l, e2[1] / l] }, "de");
+        S.yerAdi = S.yerDe.Ad;
+      }
     } else if (o.tur === "kaza" && traffic) {
       K = kazaKur(world, traffic, o);
       if (!K) { S.plan = null; return S; }
@@ -151,8 +161,14 @@ export function buildOlay({ world, scene, sky, params, traffic, zeplin = null, y
       // Önce sokak/cadde adresi olan en yakın bina (17 Kasım akşamı: en yakın bina yeni bir yapı olunca ad "Yakamoz Camii"den
       // "Çay Bahçesi yanı"na dönüyordu); yoksa en yakın adresli bina.
       const yakin = (suz) => { let enY = null, dmin = Infinity; for (const b of world.buildings) { if (!b.address || !suz(b.address)) continue; const d = Math.hypot(b.x - K.P[0], b.z - K.P[1]); if (d < dmin) { dmin = d; enY = b; } } return dmin < 80 ? enY : null; };
-      const enY = yakin((a) => /^\d+\s.*\b(Street|Road|Lane|Avenue|Way)\b/.test(a)) ?? yakin(() => true);
-      S.yerAdi = enY?.address?.split(",")[0]?.replace(/^\d+\s+/, "") ?? null; // "10 Main Street" → "Main Street"
+      if (DIL === "de") {
+        // Almanca adres: "Möwenweg 3", "Am Markt 1" → "Möwenweg", "Am Markt".
+        const enY = yakin((a) => /^[^\d,]*(straße|weg|pad|gang|stieg|ring|damm|twiete|Markt)\s\d+/i.test(a)) ?? yakin((a) => /^[^\d,]+\s\d+/.test(a));
+        S.yerAdi = enY?.address?.split(",")[0]?.replace(/\s+\d+\w*$/, "") ?? null;
+      } else {
+        const enY = yakin((a) => /^\d+\s.*\b(Street|Road|Lane|Avenue|Way)\b/.test(a)) ?? yakin(() => true);
+        S.yerAdi = enY?.address?.split(",")[0]?.replace(/^\d+\s+/, "") ?? null; // "10 Main Street" → "Main Street"
+      }
       kaza.kur(K, world);
     } else if (o.tur === "yangin" && traffic) {
       Y = yanginKur(world, traffic, o);
@@ -315,7 +331,8 @@ export function buildOlay({ world, scene, sky, params, traffic, zeplin = null, y
   }
 
   /** Sitede gösterilecek metin (üst panel, gazete; Driftwood İngilizce): { kisa, uzun } ya da null. */
-  const saatYaz = (m) => { const h = Math.floor(m / 60), mm = String(Math.floor(m % 60)).padStart(2, "0"); return `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? "AM" : "PM"}`; };
+  // Wattenoog (DIL "de"): 24 saat, "14:35 Uhr"; modüllere de bu gider (saatYaz ve saatte aynı).
+  const saatYaz = DIL === "de" ? (m) => `${clockText(Math.floor(m))} Uhr` : (m) => { const h = Math.floor(m / 60), mm = String(Math.floor(m % 60)).padStart(2, "0"); return `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? "AM" : "PM"}`; };
   api.yazi = (minute) => {
     // Etkin olay henüz başlamadıysa (öğleden sonra olayına 45 dk kala) sabahki olayın haberi sürer.
     let S = etkin(minute);
@@ -323,6 +340,7 @@ export function buildOlay({ world, scene, sky, params, traffic, zeplin = null, y
     const o = S?.plan;
     if (!o || minute < o.bas) return null;
     if (mod[o.tur]) return mod[o.tur].yazi(o, S, minute, { saatYaz, saatte: saatYaz }) ?? null;
+    if (DIL === "de") return yaziDe(o, S, minute);
     const gun = o.yuva ? "this afternoon" : "this morning", gunOrta = o.yuva ? "afternoon" : "morning";
     const bitti = minute >= o.son, yer = S.yerAdi ? `at ${S.yerAdi}` : "at an intersection";
     if (o.tur === "kaza" && K) {
@@ -343,6 +361,38 @@ export function buildOlay({ world, scene, sky, params, traffic, zeplin = null, y
     if (!T) return null;
     return { kisa: bitti ? `${T[1]} · ${saatYaz(o.bas)}` : T[0], uzun: `${saatYaz(o.bas)}: ${T[2]}` };
   };
+
+  /** Almanca metinler (Wattenoog): kurz, Nachrichtenticker; Uhrzeit 24 h. */
+  function yaziDe(o, S, minute) {
+    const gun = o.yuva ? "heute Nachmittag" : "heute Vormittag", gunOrta = o.yuva ? "Nachmittag" : "Vormittag";
+    const bitti = minute >= o.son, uhr = saatYaz(o.bas), n = S.seyirci;
+    // Straße: "in der Kurstraße", "im Möwenweg", "am Markt".
+    const s = S.yerAdi;
+    const yer = !s ? "an einer Kreuzung" : /^Am\s/.test(s) ? s.replace(/^Am/, "am") : /(straße|twiete|gasse|allee)$/i.test(s) ? `in der ${s}` : `im ${s}`;
+    const Yer = yer[0].toUpperCase() + yer.slice(1);
+    if (o.tur === "kaza" && K) {
+      const kapali = Math.round(K.son - 3 - K.bas), pol = Math.round(K.polis.varis - K.bas);
+      if (bitti) return { kisa: `Unfall ${yer} ${gun}`, uzun: `Um ${uhr} sind ${yer} zwei Autos zusammengestoßen; verletzt wurde niemand. Die Polizei war nach ${pol} Minuten da, die Kreuzung blieb ${kapali} Minuten gesperrt${n ? `; ${n} ${n === 1 ? "Schaulustiger sah" : "Schaulustige sahen"} zu` : ""}. Beide Autos gehörten Gästen vom Festland.` };
+      if (minute < K.polis.varis) return { kisa: `Eilmeldung: Unfall ${yer}`, uzun: `Um ${uhr} sind ${yer} zwei Autos zusammengestoßen. Die Polizei ist unterwegs.` };
+      return { kisa: `Unfall ${yer} · Straße gesperrt`, uzun: `${Yer} sind zwei Autos zusammengestoßen; verletzt wurde niemand. Die Polizei ist vor Ort, die Kreuzung ist gesperrt.` };
+    }
+    if (o.tur === "yangin" && Y) {
+      const yerY = S.yerAdi ?? "ein Geschäft im Ort";
+      if (bitti) return { kisa: `Feuer: ${yerY} · ${uhr}`, uzun: `Um ${uhr} brach im obersten Stock ein Feuer aus (${yerY}); verletzt wurde niemand. Die Feuerwehr war nach ${Math.round(Y.itfaiye.varis - Y.bas)} Minuten da und hat es gelöscht.` };
+      if (minute >= Y.itfaiye.varis) return { kisa: `Feuer! ${yerY} · Feuerwehr löscht`, uzun: `Aus dem obersten Stock steigt Rauch auf (${yerY}). Die Feuerwehr ist vor Ort und löscht; verletzt wurde niemand.` };
+      return { kisa: `Feuer! ${yerY}`, uzun: `Aus dem obersten Stock steigt Rauch auf (${yerY}). Die Feuerwehr ist unterwegs.` };
+    }
+    const D = S.yerDe, dak = Math.round(o.son - o.bas);
+    const T = { firtina: ["Sturm! Starkregen und Gewitter", `Gewittersturm ${gun}`, bitti ? `Ein Gewittersturm zog über die Insel; der Himmel wurde dunkel, und mitten am ${gunOrta} gingen die Straßenlaternen an.`
+        : `Ein Gewittersturm zieht über die Insel; der Himmel ist dunkel, und mitten am ${gunOrta} brennen die Straßenlaternen.`],
+      sis: ["Seenebel über der Insel", "Dichter Seenebel heute Morgen", bitti ? "Dichter Seenebel lag über der Insel; das Nebelhorn tönte alle vierzig Sekunden, Leuchtturm und Straßenlaternen brannten, bis er sich lichtete."
+        : "Dichter Seenebel liegt über der Insel; das Nebelhorn tönt alle vierzig Sekunden, Leuchtturm und Straßenlaternen brennen."],
+      balina: ["Wal vor der Küste!", `Ein Wal ${gun}`, `Ein Wal sprang ${D?.vor ?? "vor der Küste"} immer wieder aus dem Wasser${n ? `; ${n} ${n === 1 ? "Nachbar kam" : "Nachbarn kamen"} zum Zuschauen ans Wasser` : ""}.`],
+      yunus: [`Schweinswale ${D?.vor ?? "vor der Küste"}!`, `Schweinswale ${gun}`, bitti ? `Eine kleine Gruppe Schweinswale tauchte ${D?.vor ?? "vor der Küste"} ${dak} Minuten lang immer wieder zum Atmen auf${n ? `; ${n} ${n === 1 ? "Nachbar kam" : "Nachbarn kamen"} zum Zuschauen ans Wasser` : ""}.`
+        : `Eine kleine Gruppe Schweinswale taucht ${D?.vor ?? "vor der Küste"} immer wieder zum Atmen auf: kurz der dunkle Rücken mit der kleinen Finne, dann sind sie wieder weg${n ? `. ${n} ${n === 1 ? "Nachbar schaut" : "Nachbarn schauen"} vom Ufer aus zu` : ""}.`] }[o.tur];
+    if (!T) return null;
+    return { kisa: bitti ? `${T[1]} · ${uhr}` : T[0], uzun: `${uhr}: ${T[2]}` };
+  }
 
   return {
     group, api, hava, deniz,

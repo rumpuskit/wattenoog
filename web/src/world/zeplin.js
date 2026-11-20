@@ -82,7 +82,7 @@ function drawEmblem(g, cx, cy, rr) {
   g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.stroke();
 }
 
-/** Varsayılan reklam: Driftwood tanıtımı (3:1 tuval). */
+/** Varsayılan reklam: Wattenoog tanıtımı (3:1 tuval). */
 function defaultAd(W, H) {
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
@@ -112,13 +112,13 @@ function defaultAd(W, H) {
   };
   const left = W * 0.225, max = W * 0.74;
   g.textBaseline = "alphabetic"; g.textAlign = "left";
-  const big = fit("DRIFTWOOD", "900 PXpx Nunito, sans-serif", Math.round(H * 0.42), max);
+  const big = fit("WATTENOOG", "900 PXpx Nunito, sans-serif", Math.round(H * 0.42), max);
   g.fillStyle = "#ffffff";
-  g.fillText("DRIFTWOOD", left, H * 0.55);
-  fit("Follow, and you move in", "800 PXpx Nunito, sans-serif", Math.round(big * 0.34), max);
+  g.fillText("WATTENOOG", left, H * 0.55);
+  fit("Folgen und einziehen", "800 PXpx Nunito, sans-serif", Math.round(big * 0.34), max);
   g.fillStyle = "#f3dfa8";
-  g.fillText("Follow, and you move in", left + big * 0.04, H * 0.73);
-  const tw = g.measureText("Follow, and you move in").width;
+  g.fillText("Folgen und einziehen", left + big * 0.04, H * 0.73);
+  const tw = g.measureText("Folgen und einziehen").width;
   fit("TikTok @wattenoog", "700 PXpx Nunito, sans-serif", Math.round(big * 0.26), max - tw - W * 0.05);
   g.fillStyle = "rgba(255,255,255,0.85)";
   g.fillText("TikTok @wattenoog", left + big * 0.04 + tw + W * 0.035, H * 0.73);

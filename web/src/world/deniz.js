@@ -21,6 +21,7 @@
 // Olay yokken grup gizli, güncelleme hiç iş yapmaz; karede ayırma yok.
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import * as AYAR from "./olay-ayar.js";
 
 // --- yardımcılar ---
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -100,20 +101,28 @@ function kure(r, x, y, z, hex, d = 0) {
 
 // Yunus (2,4 m; şişe burunlu): gri-mavi sırt, açık karın. Kuyruk ayrı parça (pivot s = 0,78).
 const YL = 2.4, YS = 0.78, YZP = YL * (0.5 - YS);
-const Y_SIRT = new THREE.Color("#52687a"), Y_YAN = new THREE.Color("#8195a5"), Y_KARIN = new THREE.Color("#e3e8ea");
+// Mutur (Schweinswal; Wattenoog, olay-ayar.js YUNUS): aynı iskelet 0,67 ölçekle (1,6 m), koyu gri, küt baş, alçak üçgen
+// sırt yüzgeci; davranışta sıçrama yok, yalnız nefes (sırt yuvarlanarak görünür), sürü 3–6.
+const SW = AYAR.YUNUS?.tur === "schweinswal", Y_OLCEK = SW ? 0.67 : 1;
+const Y_SIRT = new THREE.Color(SW ? "#30353b" : "#52687a"), Y_YAN = new THREE.Color(SW ? "#4f565e" : "#8195a5"), Y_KARIN = new THREE.Color(SW ? "#b4b9bd" : "#e3e8ea");
 function yunusBoya(c, sa) {
   if (sa > 0.1) c.copy(Y_YAN).lerp(Y_SIRT, ss(0.1, 0.6, sa));
   else c.copy(Y_KARIN).lerp(Y_YAN, ss(-0.55, 0.1, sa));
 }
 function yunusGovde() {
-  const prof = [
+  const prof = SW ? [
+    // Küt, yuvarlak baş (gaga yok), tıknaz gövde.
+    [0.0, 0.05, 1, 0.9, -0.02], [0.03, 0.13, 1, 0.95, -0.01], [0.07, 0.19, 1, 1.0, 0.0], [0.12, 0.235, 1, 1.03, 0.0],
+    [0.2, 0.265, 1, 1.06, 0.0], [0.3, 0.28, 0.97, 1.08, 0.0], [0.42, 0.27, 0.94, 1.1, 0.0],
+    [0.55, 0.225, 0.86, 1.12, 0.0], [0.66, 0.155, 0.76, 1.2, 0.01], [0.79, 0.085, 0.6, 1.3, 0.02],
+  ] : [
     [0.0, 0.028, 1, 0.8, -0.05], [0.045, 0.045, 1, 0.8, -0.05], [0.085, 0.06, 1, 0.85, -0.045], [0.11, 0.125, 1, 1.0, -0.01],
     [0.16, 0.18, 1, 1.05, 0.0], [0.24, 0.225, 1, 1.08, 0.0], [0.34, 0.25, 0.95, 1.1, 0.0], [0.46, 0.245, 0.92, 1.1, 0.0],
     [0.58, 0.2, 0.85, 1.12, 0.0], [0.68, 0.14, 0.75, 1.2, 0.01], [0.79, 0.085, 0.6, 1.3, 0.02],
   ];
   const g = govde(prof, YL, 9, yunusBoya);
   const koyu = (c) => c.copy(Y_SIRT);
-  const sirt = levha([[-0.14, 0], [0.04, 0.17], [0.13, 0.32], [0.17, 0.31], [0.13, 0.18], [0.24, 0]], 0.05, koyu);
+  const sirt = levha(SW ? [[-0.13, 0], [0.05, 0.19], [0.1, 0.2], [0.21, 0]] : [[-0.14, 0], [0.04, 0.17], [0.13, 0.32], [0.17, 0.31], [0.13, 0.18], [0.24, 0]], 0.05, koyu);
   sirt.rotateY(Math.PI / 2).translate(0, 0.25, YL * (0.5 - 0.44) + 0.1);
   const yuzgec = (sg) => {
     const f = levha([[0, 0.05], [0.1 * sg, 0.01], [0.19 * sg, -0.08], [0.23 * sg, -0.15], [0.16 * sg, -0.13], [0, -0.07]], 0.02, (c, n) => c.copy(n.y < -0.3 ? Y_KARIN : Y_YAN));
@@ -183,7 +192,8 @@ function balinaYuzgec(sg) {
 
 /** Su altındaki kısım derinlikle suyun rengine karışır (saydam su yüzeyinin altında "havada" gibi durmasın). */
 const SU_ALTI = { value: new THREE.Color("#1f6f9a") };
-function suAlti(m) {
+function suAlti(m, k = 0.26, ust = 0.62) {
+  m.customProgramCacheKey = () => `suAlti:${k}:${ust}`; // aynı işlev metni, farklı katsayı: program ayrı
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uSuAlti = SU_ALTI;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying float vDenizY;")
@@ -195,7 +205,7 @@ function suAlti(m) {
       vDenizY = (modelMatrix * dwp).y;`);
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vDenizY;\nuniform vec3 uSuAlti;")
       .replace("#include <opaque_fragment>", `#include <opaque_fragment>
-      gl_FragColor.rgb = mix(gl_FragColor.rgb, uSuAlti, clamp(-vDenizY * 0.26, 0.0, 0.62) * step(vDenizY, 0.0));`);
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, uSuAlti, clamp(-vDenizY * ${k.toFixed(3)}, 0.0, ${ust.toFixed(3)}) * step(vDenizY, 0.0));`);
   };
   return m;
 }
@@ -249,7 +259,8 @@ export function buildDeniz({ world, scene }) {
 
   // Yunuslar: gövde + kuyruk, örnekli (2 çizim).
   const YN = 10;
-  const yMat = suAlti(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.38, metalness: 0.06 }));
+  // Mutur suyun altında hemen kaybolur (bulanık Kuzey Denizi: yalnız nefes alırken sırtı görünür).
+  const yMat = suAlti(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: SW ? 0.55 : 0.38, metalness: SW ? 0.02 : 0.06 }), SW ? 1.1 : 0.26, SW ? 0.95 : 0.62);
   const ornek = (geo, mat, n) => {
     const m = new THREE.InstancedMesh(geo, mat, n);
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.count = 0;
@@ -296,7 +307,7 @@ export function buildDeniz({ world, scene }) {
   const P = { damla: 0, tac: 0, halka: 0, leke: 0, bulut: 0 };
 
   const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, "YXZ");
-  const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
+  const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1), _yOlc = new THREE.Vector3(Y_OLCEK, Y_OLCEK, Y_OLCEK), _sifir = new THREE.Vector3(1e-4, 1e-4, 1e-4);
   const koy = (mesh, sayac, x, y, z, sx, sy, sz, alfa, ry = 0) => {
     const i = P[sayac]; if (i >= mesh.instanceMatrix.count) return;
     _q.setFromAxisAngle(_Y, ry); _p.set(x, y, z); _s.set(sx, sy, sz);
@@ -508,8 +519,8 @@ export function buildDeniz({ world, scene }) {
     [H.f1x, H.f1z] = uzak(bal ? 260 : 230, sg * 70);
     [H.f2x, H.f2z] = uzak(bal ? 300 : 260, -sg * 90);
     // Yunus sürüsü: 7–9 yunus, sıralar halinde (j ile j+1 çoğunlukla yan yana: eşli sıçrama).
-    H.N = 7 + Math.floor(hr(t, 6) * 3);
-    H.adim = H.N === 9 ? 2 : 3;
+    H.N = SW ? 3 + Math.floor(hr(t, 6) * 4) : 7 + Math.floor(hr(t, 6) * 3);
+    H.adim = SW ? (H.N === 4 ? 3 : H.N === 6 ? 5 : 2) : H.N === 9 ? 2 : 3;
     for (let j = 0; j < YN; j++) {
       H.lat[j] = ((j % 3) - 1) * 2.3 + (hr(t, 7, j) - 0.5) * 1.0;
       H.lon[j] = 3 - Math.floor(j / 3) * 3.1 + (hr(t, 8, j) - 0.5) * 1.2;
@@ -544,6 +555,7 @@ export function buildDeniz({ world, scene }) {
     const r = hr(t, b, 1), r2 = hr(t, b, 2), r3 = hr(t, b, 3);
     let tip = 0;
     if (tb < 22 || tb > H.T - 48) tip = 0;
+    else if (SW) tip = r < 0.78 ? 1 : 0; // mutur: yalnız nefes (alçak yuvarlanma), sıçrama yok
     else if (u < 0.15) tip = r < 0.42 ? 1 : r < 0.74 ? 2 : r < 0.8 ? 3 : 0;
     else if (u < 0.85) {
       tip = 1;
@@ -586,7 +598,7 @@ export function buildDeniz({ world, scene }) {
       if (s > Tw) continue;
       aktif = i;
       if (tip === 1) {
-        ay = -0.75 + 0.6 * Math.sin((Math.PI * s) / Tw); w = ss(0, 0.2, s) * (1 - ss(Tw - 0.2, Tw, s));
+        ay = SW ? -0.62 + 0.5 * Math.sin((Math.PI * s) / Tw) : -0.75 + 0.6 * Math.sin((Math.PI * s) / Tw); w = ss(0, 0.2, s) * (1 - ss(Tw - 0.2, Tw, s));
       } else if (tip === 6) {
         // Kuyruk vurma: yüzeyde burun aşağı, kuyruk iki kez kalkıp suya iner (s = 0,9 ve 1,6).
         const zarf = ss(0, 0.35, s) * (1 - ss(1.85, 2.2, s));
@@ -604,7 +616,7 @@ export function buildDeniz({ world, scene }) {
     const lon = H.lon[j] + 1.4 * Math.sin(t * 0.23 + H.ph[j] * 1.7) + ileri;
     out.x = M0.x + fx * lon + fz * lat; out.z = M0.z + fz * lon - fx * lat;
     // Yüzme derinliği: aralıkla sırt yüzgeci suyu yarar; geliş ve gidişte derinde.
-    let base = -0.62 - 0.38 * Math.cos((TAU * t) / H.per[j] + H.ph[j]);
+    let base = SW ? -1.15 - 0.25 * Math.cos((TAU * t) / H.per[j] + H.ph[j]) : -0.62 - 0.38 * Math.cos((TAU * t) / H.per[j] + H.ph[j]);
     base -= 2.2 * (1 - ss(0, 25, t)) + 2.6 * ss(H.T - 50, H.T - 5, t);
     out.y = mix(base, ay, w);
     out.fx = fx; out.fz = fz; out.roll = roll; out.bend = bend; out.pov = pov; out.pw = pw; out.aktif = aktif;
@@ -704,10 +716,11 @@ export function buildDeniz({ world, scene }) {
       yunusDurum(j, t, YD); yunusDurum(j, t + 0.05, YD2);
       const dx = YD2.x - YD.x, dy = YD2.y - YD.y, dz = YD2.z - YD.z, vh = Math.hypot(dx, dz) || 1e-6;
       const yaw = Math.atan2(dx, dz);
-      let pitch = Math.atan2(dy, vh);
+      let pitch = Math.atan2(dy, vh) * (SW ? 0.45 : 1); // mutur: yassı yuvarlanma, burun yukarı dikilmez
       if (YD.pw > 0) pitch = mix(pitch, YD.pov, YD.pw);
       _e.set(-pitch, yaw, YD.roll, "YXZ"); _q.setFromEuler(_e); _p.set(YD.x, YD.y, YD.z);
-      _m.compose(_p, _q, _one); yGovde.setMatrixAt(j, _m);
+      // Mutur bulanık suda görünmez: yalnız yüzeye yaklaşınca (nefes) çizilir.
+      _m.compose(_p, _q, SW && YD.y < -0.62 ? _sifir : _yOlc); yGovde.setMatrixAt(j, _m);
       // Kuyruk: yüzerken çırpar, havada hafif bükük.
       const suda = 1 - ss(-0.4, 0.2, YD.y);
       const bend = YD.bend + 0.24 * Math.sin(t * TAU * 1.5 + H.ph[j]) * suda * (YD.pw > 0 ? 0 : 1);
@@ -732,7 +745,7 @@ export function buildDeniz({ world, scene }) {
         const j = k === 0 ? VS[i] : k === 1 ? VO1[i] : VO2[i];
         if (j < 0) continue;
         const bas = b * B + VOF[i] + 0.07 * k, Tw = VSURE[i], tk = (H.tohum ^ (b * 131 + k * 17)) | 0;
-        if (tip === 1) yAn(j, bas + Tw * 0.5, 0.2, 0, tk + 1, t);
+        if (tip === 1) yAn(j, bas + Tw * 0.5, SW ? 0.08 : 0.2, 0, tk + 1, t);
         else if (tip === 6) { yAn(j, bas + 0.9, 0.75, 1.0, tk + 2, t); yAn(j, bas + 1.6, 0.75, 1.0, tk + 3, t); }
         else {
           const air = Math.sqrt((2 * VH[i]) / G), half = Tw / 2;

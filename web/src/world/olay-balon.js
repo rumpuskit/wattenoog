@@ -9,6 +9,7 @@ import { DIL, ZEPLIN as AD } from "./olay-ayar.js";
 import { kesir } from "./olay-plan.js";
 import { isHoliday } from "../sim.js";
 import { adaylar, gorevler, yerlerSec, izleDurus, agaclar, agacIzgara, pusula } from "./olay-izleyici.js";
+import { acikAlan } from "./olay-yardim.js";
 
 const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 const clamp01 = (u) => Math.max(0, Math.min(1, u));
@@ -79,6 +80,8 @@ export function buildBalonOlay({ world, scene, group }) {
       }
       if (en && Math.hypot(en.x - M[0], en.z - M[1]) < 420) return en;
     }
+    // Wattenoog: saha (360) ve Kurpark (560) açılmadan önce kasabanın kenarında açık bir çayır.
+    if (DIL === "de") { const c = acikAlan(world, M, { uz: 44, en: 44, rMin: 110, rMax: 420, adim: 20 }); if (c && acik(world, iz, c.x, c.z, 18, 13)) return { x: c.x, z: c.z, tur: "cimen" }; }
     return null;
   }
 
@@ -205,7 +208,10 @@ export function buildBalonOlay({ world, scene, group }) {
     }
     K = { o, C, L, Lgy, T, B, n, t0, t1, D, wx, wz, nx, nz, denizde, odak, kal, kal1: [C.x - wx * 40, C.z - wz * 40], kal2: [L.x + lx * kalD, L.z + lz * kalD],
       yonAd: pusula(Math.atan2(wx, wz), DIL), izleyen: [0, 0] };
-    K.yer = DIL === "en"
+    K.yer = DIL === "de"
+      ? { kalkis: C.tur === "tarla" ? AD.tarla : { auf: `auf einer Wiese ${pusula(Math.atan2(C.x - M[0], C.z - M[1]), "de")} des Ortes`, Ad: "Wiese" },
+        inis: L.tur === "saha" ? AD.saha : L.tur === "park" ? AD.park : AD.yedekSaha, yon: pusula(Math.atan2(wx, wz), "de-ad") }
+      : DIL === "en"
       ? { kalkis: C.tur === "tarla" ? "the farm fields" : `the meadow ${pusula(Math.atan2(C.x - M[0], C.z - M[1]), "en")} of town`, inis: L.tur === "saha" ? AD.saha.ad : L.tur === "cimen" ? AD.yedekSaha.ad : "the park" }
       : { de: C.tur === "tarla" ? "tarlalarda" : "çayırda", inisE: L.tur === "saha" ? AD.saha.e : L.tur === "cimen" ? AD.yedekSaha.e : "parka" };
     gorunumKur(n, o.tohum);
@@ -386,6 +392,19 @@ export function buildBalonOlay({ world, scene, group }) {
       const izle2 = i2 ? ` ${i2} ${i2 === 1 ? "neighbor" : "neighbors"} gathered at the edge to watch it land.` : "";
       if (minute < o.son) return { kisa: `Balloon landed on ${Y.inis}`, uzun: `${n} hot air balloons lifted off from ${Y.kalkis} at ${saatYaz(kalk)}. One landed on ${Y.inis} at ${saatYaz(yer)}.${izle2} The other ${n - 1} ${gitti}.` };
       return { kisa: `Hot air balloons ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`, uzun: `At ${saatYaz(kalk)} ${n} hot air balloons lifted off from ${Y.kalkis} and drifted over the island. One landed on ${Y.inis} at ${saatYaz(yer)}, and its envelope was laid down on the grass.${izle2} The other ${n - 1} ${gitti}.` };
+    }
+    if (DIL === "de") {
+      // Heißluftballons (Wattenoog): Start am Polder, einer landet nahe dem Ort.
+      const Y = K.yer, izle1 = i1 ? ` ${i1} ${i1 === 1 ? "Nachbar kam" : "Nachbarn kamen"} zum Zuschauen.` : "";
+      const izle2 = i2 ? ` ${i2} ${i2 === 1 ? "Schaulustiger sah" : "Schaulustige sahen"} am Rand bei der Landung zu.` : "";
+      const gitti = K.denizde ? `trieben Richtung ${Y.yon} aufs Meer hinaus` : `trieben weiter Richtung ${Y.yon}`;
+      const andere = n - 1 === 1 ? "Der andere Ballon" : `Die anderen ${n - 1}`;
+      const gitti1 = n - 1 === 1 ? gitti.replace(/^trieben/, "trieb") : gitti;
+      if (sec < K.B[0].kalk) return { kisa: `Heißluftballons ${Y.kalkis.auf}!`, uzun: `Um ${saatYaz(o.bas)} begannen Teams, ${Y.kalkis.auf} ${n} Heißluftballons aufzublasen.${izle1}` };
+      if (sec < T.inis) return { kisa: `${n} Heißluftballons über der Insel!`, uzun: `Um ${saatYaz(kalk)} sind ${n} Heißluftballons ${Y.kalkis.auf} gestartet und treiben Richtung ${Y.yon} über die Insel.${izle1}` };
+      if (sec < T.yer) return { kisa: "Ein Ballon setzt zur Landung an", uzun: `${n} Heißluftballons sind um ${saatYaz(kalk)} ${Y.kalkis.auf} gestartet. Einer sinkt jetzt ${Y.inis.ziel} hinab.` };
+      if (minute < o.son) return { kisa: `Ballon gelandet: ${Y.inis.Ad}`, uzun: `${n} Heißluftballons sind um ${saatYaz(kalk)} ${Y.kalkis.auf} gestartet. Einer landete um ${saatYaz(yer)} ${Y.inis.auf}.${izle2} ${andere} ${gitti1}.` };
+      return { kisa: `Heißluftballons ${o.yuva ? "heute Nachmittag" : "heute Vormittag"} · ${saatYaz(o.bas)}`, uzun: `Um ${saatYaz(kalk)} stiegen ${n} Heißluftballons ${Y.kalkis.auf} auf und schwebten über die Insel. Einer landete um ${saatYaz(yer)} ${Y.inis.auf}, seine Hülle wurde auf dem Rasen ausgelegt.${izle2} ${andere} ${gitti1}.` };
     }
     const Y = K.yer, izle1 = i1 ? ` ${i1} kişi izlemeye geldi.` : "", izle2 = i2 ? ` ${i2} kişi alanın kenarına toplandı.` : "";
     const gitti = K.denizde ? `denizin üstünden ${K.yonAd} uzaklaştı` : `${K.yonAd} doğru uzaklaştı`;

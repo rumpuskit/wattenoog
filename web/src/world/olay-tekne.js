@@ -257,3 +257,98 @@ export function dumanKur(group, n = 14, renk = "#2a2a2c") {
     },
   };
 }
+
+// --- Wattenoog (Kuzey Denizi) ekleri: kanal rotası, Krabbenkutter, Heilbutt ---
+
+/** Noktalardan geçen yumuşak rota (centripetal Catmull-Rom, yay boyuyla parametreli): Watt'ta tekneler yalnız Priel/
+ *  Fahrrinne ve liman ağzından geçer. at(e, out) → out { x, z, h } (e 0..1, h: teğet yönü atan2(dx, dz)). */
+export function rota(noktalar) {
+  const c = new THREE.CatmullRomCurve3(noktalar.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal");
+  c.arcLengthDivisions = 400;
+  const L = c.getLength(), p = new THREE.Vector3(), t = new THREE.Vector3();
+  return {
+    L,
+    at(e, out) {
+      const u = clamp01(e);
+      c.getPointAt(u, p); c.getTangentAt(u, t);
+      out.x = p.x; out.z = p.z; out.h = Math.atan2(t.x, t.z);
+      return out;
+    },
+  };
+}
+
+/** Küçük Krabbenkutter (len m; pruva +z): koyu gövde, önde beyaz kaptan köşkü, ortada direk ve iki yana V biçiminde
+ *  kaldırılmış ağ kolları (Ausleger) + sarkan ağlar (harbor.js kutter'ın yarış boyu sürümü). Dönen istakozTeknesi gibi:
+ *  { mesh, H, kosk: { cy, ch, cw, z0, z1, roofZ0 } } (numara levhaları köşke). */
+export function krabbenkutter(len = 11, renk = "#1f3f5f", serit = "#f4f1ea") {
+  const beam = len * 0.32, depth = len * 0.14;
+  const H = hull(len, beam, depth, { top: renk, stripe: serit, deck: "#8f6a49", inner: renk });
+  const at = (s) => ({ z: H.z(s), y: H.deckY(s), w: H.deckW(s) });
+  const p = [H.geo];
+  const s0 = 0.56, s1 = 0.76, z0 = H.z(s0), z1 = H.z(s1), cw = Math.min(at(s0).w, at(s1).w) * 1.55, ch = len * 0.16, cy = Math.max(at(s0).y, at(s1).y);
+  p.push(box(cw, ch, z1 - z0, 0, cy + ch / 2, (z0 + z1) / 2, "#f6f4ee"));
+  p.push(box(cw + 0.03, ch * 0.3, (z1 - z0) * 0.8, 0, cy + ch * 0.72, (z0 + z1) / 2, "#25303b"));
+  p.push(box(cw * 0.88, ch * 0.3, 0.04, 0, cy + ch * 0.72, z1 + 0.01, "#25303b"));
+  p.push(box(cw + 0.2, 0.09, z1 - z0 + 0.25, 0, cy + ch + 0.045, (z0 + z1) / 2, renk));
+  // Direk ve Ausleger (köşkün kıç tarafında), uçlarından sarkan ağ torbaları.
+  const m = at(0.4), mh = len * 0.55, base = new THREE.Vector3(0, m.y + 0.5, m.z);
+  p.push(cyl(0.07, 0.1, mh, 0, m.y + mh / 2, m.z, "#d9d4c8", 6));
+  for (const side of [-1, 1]) {
+    const tip = new THREE.Vector3(side * len * 0.36, m.y + len * 0.52, m.z);
+    p.push(rod(base, tip, 0.06, "#d9d4c8"));
+    p.push(rod(new THREE.Vector3(0, m.y + mh, m.z), tip, 0.015, "#b9b4a8"));
+    p.push(colored(new THREE.ConeGeometry(0.32, 1.8, 6).rotateX(Math.PI).translate(tip.x * 0.92, tip.y - 1.1, tip.z), "#3f6f6a"));
+    p.push(box(0.09, 0.09, 1.7, tip.x * 0.92, tip.y - 0.2, tip.z, "#5a5f66"));
+  }
+  // Kıçta vinç tamburu ve mavi kasalar; usturmaçalar.
+  const a = at(0.14);
+  p.push(colored(new THREE.CylinderGeometry(0.24, 0.24, Math.min(1, a.w * 1.3), 10).rotateZ(Math.PI / 2).translate(0, a.y + 0.4, a.z), "#c94f3a"));
+  for (const [dx, dz] of [[-0.4, 0.5], [0.4, 0.5]]) p.push(box(0.45, 0.28, 0.36, dx * a.w, a.y + 0.14, a.z + dz, "#3e7fb0"));
+  for (const side of [-1, 1]) for (const s of [0.3, 0.6]) p.push(cyl(0.1, 0.1, 0.36, side * (H.halfW(s) + 0.1), H.sheer(s) * 0.5, H.z(s), "#2a2d33", 8));
+  const mesh = new THREE.Mesh(birlestir(p), TEKNE_MAT());
+  mesh.castShadow = true;
+  return { mesh, H, kosk: { cy, ch, cw, z0, z1, roofZ0: z0 } };
+}
+
+/** Dev Heilbutt (boy L; baş +z, yassı gövde: geniş yüzler ±x). Gözlü yüz (koyu zeytin-kahve, benekli) gozYan tarafında
+ *  (−1: −x), kör yüz beyaz. Elmas gövde, hilal kuyruk; kuyruk sapından askıya asılır (orkinosla aynı yön kuralı). */
+export function heilbuttGeo(L = 2.4, gozYan = -1) {
+  const P = [[0.5, 0], [0.45, 0.085], [0.32, 0.165], [0.14, 0.222], [-0.06, 0.212], [-0.24, 0.14], [-0.35, 0.055], [-0.41, 0.06], [-0.52, 0.2],
+    [-0.47, 0.02], [-0.47, -0.02], [-0.52, -0.2], [-0.41, -0.06], [-0.35, -0.055], [-0.24, -0.14], [-0.06, -0.212], [0.14, -0.222], [0.32, -0.16], [0.45, -0.075]];
+  const sh = new THREE.Shape();
+  sh.moveTo(P[0][0] * L, P[0][1] * L);
+  sh.splineThru(P.slice(1).concat([P[0]]).map(([a, b]) => new THREE.Vector2(a * L, b * L)));
+  const D = 0.06 * L, bev = 0.025 * L;
+  const g = new THREE.ExtrudeGeometry(sh, { depth: D, bevelEnabled: true, bevelThickness: bev, bevelSize: bev * 0.8, bevelSegments: 2, curveSegments: 28 });
+  g.translate(0, 0, -D / 2).rotateY(-Math.PI / 2); // şekil x → +z (baş), kalınlık → x
+  const pos = g.attributes.position, col = new Float32Array(pos.count * 3);
+  const koyu = new THREE.Color("#4a4430"), benek = new THREE.Color("#2d2a1e"), acik = new THREE.Color("#6a6245"), beyaz = new THREE.Color("#eeeee6"), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) * gozYan, y = pos.getY(i) / L, z = pos.getZ(i) / L;
+    const n = Math.sin(y * 41 + z * 17) * Math.sin(z * 37 - y * 13) + 0.5 * Math.sin(y * 83 + z * 71);
+    c.copy(n > 0.55 ? benek : n < -0.6 ? acik : koyu);
+    const k = THREE.MathUtils.smoothstep(x, -D * 0.25, D * 0.35); // gözlü yüz
+    c.lerp(beyaz, 1 - k);
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  const xg = gozYan * (D / 2 + bev * 0.9);
+  const goz = (yy, zz) => colored(new THREE.SphereGeometry(0.022 * L, 8, 6).scale(0.6, 1, 1).translate(xg, yy * L, zz * L), "#e8d9a0");
+  const bebek = (yy, zz) => colored(new THREE.SphereGeometry(0.012 * L, 6, 5).translate(xg + gozYan * 0.008 * L, yy * L, zz * L), "#0d0f12");
+  return birlestir([g, goz(0.055, 0.41), goz(0.1, 0.385), bebek(0.055, 0.41), bebek(0.1, 0.385),
+    colored(new THREE.BoxGeometry(0.02 * L, 0.012 * L, 0.06 * L).translate(xg * 0.9, 0.0, 0.47 * L), "#2a1f1a")]);
+}
+
+/** Fischbrötchen (boy ~0,2 m; uzun ekseni +z): yarık ekmek, arasında ringa (Bismarckhering) filetosu, soğan halkaları,
+ *  marul. Martının gagasında ve suda. */
+export function fischbroetchenGeo() {
+  const p = [
+    colored(new THREE.CapsuleGeometry(0.035, 0.13, 4, 10).rotateX(Math.PI / 2).scale(1.05, 0.62, 1).translate(0, -0.018, 0), "#d9a35e"),
+    colored(new THREE.CapsuleGeometry(0.034, 0.12, 4, 10).rotateX(Math.PI / 2).scale(1.0, 0.5, 1).translate(0, 0.026, 0), "#c98a45"),
+    colored(new THREE.BoxGeometry(0.075, 0.012, 0.17).translate(0, 0.004, 0), "#7fae4a"), // marul
+    colored(new THREE.CapsuleGeometry(0.022, 0.16, 3, 8).rotateX(Math.PI / 2).scale(1.2, 0.45, 1).translate(0, 0.008, 0.012), "#b9c3c9"), // ringa (gümüş)
+    colored(new THREE.CapsuleGeometry(0.012, 0.14, 3, 6).rotateX(Math.PI / 2).translate(0.024, 0.011, 0.012), "#5d6c78"), // ringanın sırtı
+  ];
+  for (const z of [-0.05, 0, 0.05]) p.push(colored(new THREE.TorusGeometry(0.02, 0.004, 4, 10).rotateX(Math.PI / 2).translate(-0.012, 0.014, z), "#efe8f2"));
+  return birlestir(p);
+}

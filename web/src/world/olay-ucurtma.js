@@ -7,6 +7,10 @@ import * as THREE from "three";
 import { DIL, UCURTMA as YER } from "./olay-ayar.js";
 import { kesir } from "./olay-plan.js";
 import { adaylar, gorevler, yerlerSec, izleDurus, agaclar, agacIzgara, agacTepe } from "./olay-izleyici.js";
+import { promenadeZ } from "./island.js";
+// Wattenoog (UCURTMA.yer "plaj"): Drachenfest am Hauptstrand. Alan kumsalın kuru kumu (yüksek suyun ve Strandkorb
+// sıralarının dışında, Strandkorb'ların batısında); rüzgâr kıyıya koşut eser (uçurtmalar kumsalın üstünde kalır, denize ve
+// kumullara uçmaz). Takılma ağaca değil, sıranın ucundaki bir Strandkorb'a.
 
 const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 const clamp01 = (u) => Math.max(0, Math.min(1, u));
@@ -75,7 +79,68 @@ export function buildUcurtmaOlay({ world, scene, group }) {
     return (G = { g, baklava, delta, dev, ahtapot, balik, kurdele, kazik, ip, ipGeo });
   }
 
+  /** Kumsal şenliği (Wattenoog): alan, rüzgâr, uçanların ve gösteri uçurtmalarının yerleri, takılacak Strandkorb. */
+  function plajKur(o) {
+    const gy = (x, z) => world.groundY?.(x, z) ?? 0;
+    const hb = (world.labels ?? []).find((l) => l.text === "Hauptstrand");
+    const cx = hb?.x ?? world.placeOf?.("plaj")?.anchors?.[5]?.[0] ?? 0;
+    // Kumsalda "geri" = su kenarından (ortalama su) karaya metre; yüksek su ~39 m'ye, Strandkorb'lar 50–64 m'de, kumul ~80 m.
+    const nokta = (x, geri) => world.coastPoint(x, promenadeZ(x), 0, -1, geri);
+    const koerbe = world.beach?.koerbe ?? [];
+    const x0 = koerbe.length ? Math.min(...koerbe.map((k) => k.x)) : cx - 150; // sıraların batı ucu
+    const T = nokta(x0 - 70, 60), alanR = 48;
+    // Takılacak Strandkorb: batı ucundaki orta sıra (geri 57).
+    const korb = koerbe.filter((k) => k.x < x0 + 5).sort((a, b) => Math.abs(a.z - T[1]) - Math.abs(b.z - T[1]))[0] ?? null;
+    const aw = Math.PI / 2 + (kesir("ucRuz", o.tohum) - 0.5) * 0.24; // doğuya (Strandkorb'lara doğru), kıyıya koşut
+    const W = [Math.sin(aw), Math.cos(aw)], N = [W[1], -W[0]];
+    const kuru = (x, z) => world.isWalkable?.(x, z) && gy(x, z) > 1.15; // bahar gelgitinin yüksek suyunun (+0,95) üstü
+    const yerler = [];
+    for (let t = 0; yerler.length < MAKS_EL && t < 900; t++) {
+      const x = x0 - 125 + kesir("ucYerA", o.tohum, t) * 108, geri = 46 + kesir("ucYerR", o.tohum, t) * 26;
+      const [px, pz] = nokta(x, geri);
+      if (!kuru(px, pz) || yerler.some((q) => Math.hypot(q.x - px, q.z - pz) < 3.5)) continue;
+      yerler.push({ x: px, z: pz, heading: aw });
+    }
+    let sahip = null, agac = null;
+    if (korb) {
+      agac = { x: korb.x, z: korb.z, y: gy(korb.x, korb.z), h: 1.9 };
+      for (let t = 0; t < 40 && !sahip; t++) {
+        const d = 20 + t * 0.4, yan = (kesir("ucSahip", o.tohum, t) - 0.5) * 5;
+        const x = agac.x - W[0] * d + N[0] * yan, z = agac.z - W[1] * d + N[1] * yan;
+        if (kuru(x, z) && !yerler.slice(0, 3).some((q) => Math.hypot(q.x - x, q.z - z) < 3.5)) sahip = { x, z, heading: aw, sahip: true };
+      }
+      if (sahip) yerler.unshift(sahip); else agac = null;
+    }
+    // Gösteri uçurtmaları: alanın deniz ve kumul kenarında (geri ~44 ve ~76), kumda torbalarla sabit.
+    const gos = [];
+    for (let t = 0; gos.length < 10 && t < 900; t++) {
+      const kenar = t % 2 ? 44 : 75, x = x0 - 135 + kesir("ucGosU", o.tohum, t) * 100;
+      const [px, pz] = nokta(x, kenar + (kesir("ucGos", o.tohum, t) - 0.5) * 4);
+      if (!kuru(px, pz) || gos.some((q) => Math.hypot(q.x - px, q.z - pz) < 7) || yerler.slice(0, 30).some((q) => Math.hypot(q.x - px, q.z - pz) < 3)) continue;
+      const tur = 2 + (gos.length % 3);
+      gos.push({ x: px, z: pz, y: gy(px, pz) + 0.35, tur, L: 40 + kesir("ucGosL", o.tohum, t) * 14, el: 0.66 + kesir("ucGosE", o.tohum, t) * 0.16, renk: RENK[Math.floor(kesir("ucGosR", o.tohum, t) * RENK.length)], faz: kesir("ucGosF", o.tohum, t) * 6.28,
+        t0: o.bas + (0.03 + 0.06 * kesir("ucGosT", o.tohum, t)) * (o.son - o.bas), t1: o.son - 1 - 2 * kesir("ucGosT1", o.tohum, t) });
+    }
+    return { T, alanR, agac, aw, W, N, yerler, gos, gy };
+  }
+
   function kur(o) {
+    if (YER.yer === "plaj") {
+      const P = plajKur(o);
+      const { T, W, N, aw, alanR, agac, yerler, gos, gy } = P, D = o.son - o.bas;
+      K = { o, T, W, N, aw, alanR, agac, yerler, gos, ucan: [], D, tS: o.bas + 0.5 * D, tK: o.bas + 0.76 * D, izleyen: 0, gy, plaj: true,
+        odak: [T[0] + W[0] * 14, T[1] + W[1] * 14] };
+      if (agac) { K.tepe = [agac.x - W[0] * 0.3, agac.y + 1.95, agac.z - W[1] * 0.3]; K.agacAd = "Strandkorb"; }
+      gorunum();
+      for (const m of [G.baklava, G.delta, G.dev, G.ahtapot, G.balik]) m.count = 0;
+      G.kazik.count = gos.length;
+      gos.forEach((q, k) => G.kazik.setMatrixAt(k, M4.compose(V.set(q.x, gy(q.x, q.z), q.z), Q.setFromAxisAngle(AY, aw), SC.set(1, 1, 1))));
+      G.kazik.instanceMatrix.needsUpdate = true;
+      // Kamera kumuldan denize doğru çapraz: kumsal, uçanlar ve uçurtmalar birlikte (deniz arkada).
+      const yon = Math.atan2(-W[0] * 0.55, 0.85);
+      return { odak: K.odak, odakY: 14, kalabalik: [T[0] - W[0] * 4, T[1] - W[1] * 4], kiyi: null, yon, yerAdi: "Hauptstrand", zaman: null,
+        gitD: 95, gitEgim: 0.35, gitCanli: true, kalabalikArkadan: true, cekimOlcek: 1.4, cekimOlcekH: 0.9 };
+    }
     const iz = agacIzgara(agaclar(world, scene));
     let T, alanR, ic = 3;
     if (YER.yer === "cimen") {
@@ -147,7 +212,7 @@ export function buildUcurtmaOlay({ world, scene, group }) {
   function gorev(people, day, S, plans) {
     if (!K) return [];
     const { o, D } = K, haric = new Set();
-    const a1 = adaylar(people, day, plans, world, { T: o.bas + 2, odak: K.T, isR: 0, uzak: YER.yer === "cimen" ? 4 : 3.2, haric, sure: 15 });
+    const a1 = adaylar(people, day, plans, world, { T: o.bas + 2, odak: K.T, isR: 0, uzak: YER.yer === "plaj" ? 5 : YER.yer === "cimen" ? 4 : 3.2, haric, sure: 15 });
     const n1 = Math.min(a1.length, K.yerler.length, YER.yer === "cimen" ? 14 : 26);
     const g1 = gorevler(people, day, a1, K.yerler.slice(0, n1), { T0: o.bas + 0.5, dagilim: Math.round(D * 0.1), kal: [Math.round(D * 0.78), Math.round(D * 0.9)], Tson: o.son - 0.5, modul: "ucurtma", ek: { rol: "ucan" }, tuz: "u1" });
     // Sahip (ilk yer) en geç kurtarmadan 8 dk sonrasına dek kalmalı; kalmıyorsa sahiplik düşer.
@@ -161,7 +226,7 @@ export function buildUcurtmaOlay({ world, scene, group }) {
     g1.forEach((g, k) => { haric.add(g.i); g.item.k = k; });
     if (!K.ucan.some((u) => u.sahip)) K.agacOlay = false; else K.agacOlay = !!K.agac;
     // İzleyiciler: alanın kenarında, gökyüzüne bakarak.
-    const a2 = adaylar(people, day, plans, world, { T: o.bas + 8, odak: K.T, isR: 120, uzak: 1.6, haric });
+    const a2 = adaylar(people, day, plans, world, { T: o.bas + 8, odak: K.T, isR: YER.yer === "plaj" ? 260 : 120, uzak: YER.yer === "plaj" ? 3 : 1.6, haric });
     const y2 = yerlerSec(world, null, [K.T[0] - K.W[0] * (K.alanR + 6), K.T[1] - K.W[1] * (K.alanR + 6)], K.odak, Math.min(12, a2.length), 3, 12, o.tohum + 3, { kiyida: true, yay: 2.4 });
     const g2 = gorevler(people, day, a2, y2, { T0: o.bas + 5, dagilim: 12, kal: [10, 20], Tson: o.son, modul: "ucurtma", tavirlar: ["cek", "goster", "bak", "konus", "siper"], ek: { rol: "izle" }, tuz: "u2" });
     K.izleyen = g2.length;
@@ -365,6 +430,17 @@ export function buildUcurtmaOlay({ world, scene, group }) {
       const iz = izl ? ` ${izl} more came to watch.` : "";
       if (minute < o.son) return { kisa: agacOldu && !kurtuldu ? "A kite is stuck in a tree!" : minute < o.bas + 0.12 * K.D ? `Kite festival on ${Y}` : `${top} kites over ${Y}!`, uzun: bas + ag + iz };
       return { kisa: `Kite festival ${o.yuva ? "this afternoon" : "this morning"} · ${saatYaz(o.bas)}`, uzun: `At ${saatYaz(o.bas)} ${top} kites went up over ${Y}: ${nG} big show kites on stakes${n1 ? ` and ${n1} flown by neighbors` : ""}.${K.agacOlay ? ` One got caught in ${K.agacAd} tree at ${saatYaz(K.tS + 0.5)}; its owner tugged it free at ${saatYaz(K.tK + 0.35)}.` : ""}${iz}` };
+    }
+    if (DIL === "de") {
+      // YER.ad "der Hauptstrand" → "am Hauptstrand", "über dem Hauptstrand".
+      const A = YER.ad.replace(/^(der|die|das) /, ""), f = /^die /.test(YER.ad);
+      const an = f ? `an der ${A}` : `am ${A}`, ueber = f ? `über der ${A}` : `über dem ${A}`, gun = o.yuva ? "heute Nachmittag" : "heute Vormittag";
+      const yerT = K.plaj ? "an einem Strandkorb" : "in einem Baum";
+      const bas = `Um ${saatYaz(o.bas)} hat ${an} ein Drachenfest begonnen: ${nG} große Schaudrachen sind am Rand im Sand verankert${n1 ? `, ${n1} ${n1 === 1 ? "Nachbar lässt seinen Drachen" : "Nachbarn lassen ihre Drachen"} steigen` : ""}.`;
+      const ag = agacOldu ? ` Um ${saatYaz(K.tS + 0.5)} verfing sich ein Drachen ${yerT}; ${kurtuldu ? `der Besitzer zog ihn um ${saatYaz(K.tK + 0.35)} frei und ließ ihn wieder steigen.` : "der Besitzer zieht unten an der Leine."}` : "";
+      const iz = izl ? ` ${izl} ${izl === 1 ? "Person schaut" : "Leute schauen"} vom Rand aus zu.` : "";
+      if (minute < o.son) return { kisa: agacOldu && !kurtuldu ? `Drachen hängt ${yerT} fest!` : minute < o.bas + 0.12 * K.D ? `Drachenfest ${an}` : `${top} Drachen ${ueber}!`, uzun: bas + ag + iz };
+      return { kisa: `Drachenfest ${gun} · ${saatYaz(o.bas)}`, uzun: `Um ${saatYaz(o.bas)} stiegen ${top} Drachen ${ueber} auf: ${nG} große Schaudrachen${n1 ? ` und ${n1} Drachen von Nachbarn` : ""}.${K.agacOlay ? ` Um ${saatYaz(K.tS + 0.5)} verfing sich einer ${yerT}; der Besitzer zog ihn um ${saatYaz(K.tK + 0.35)} wieder frei.` : ""}${izl ? ` ${izl} ${izl === 1 ? "Person sah" : "Leute sahen"} vom Rand aus zu.` : ""}` };
     }
     const Y = YER;
     const bas = `Saat ${saatte(o.bas)} ${Y.de} uçurtma şenliği başladı: kenarlara ${nG} büyük gösteri uçurtması kazıkla bağlandı${n1 ? `, ${n1} kişi uçurtmasını uçuruyor` : ""}.`;

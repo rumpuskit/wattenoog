@@ -16,7 +16,7 @@ import { resolve } from "node:path";
 // TODO(ses seçimi, DEVIR §9.2/§13): "Inselchronist" anlatıcısının ElevenLabs ses kimliği. Almanca anadil, kuru, sakin,
 // hafif Kuzey Alman tınısı (radyo sesi değil); 3–4 aday aynı iki cümleyle örneklenir, kullanıcı dinleyip seçer. Seçilince
 // yalnız buraya yazılır (ve ANLATIM-STANDARDI.md §7'ye). Boşken sentez hata verir: kredi harcanmaz, yanlış sesle video çıkmaz.
-export const ANLATICI_SESI = null;
+export const ANLATICI_SESI = "tLPh1ULk9PH3P3AuK6rm"; // ElevenLabs kütüphanesi: "Julian" (genç, rahat seslendirme; kullanıcı 20 Kasım'da 4 adaydan seçti)
 
 export const SES = {
   voice: ANLATICI_SESI,

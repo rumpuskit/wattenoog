@@ -237,7 +237,7 @@ export function sokakName(mahalle, sokak) {
   return `${names[n]} ${ekler[(Math.floor(g / names.length) + n) % ekler.length]}`;
 }
 
-/** Mahallenin konut tipi (katalog "konut"): cottage 1, twofamily 2, fourplex 4, apartments 8 birim/yapı. */
+/** Mahallenin konut tipi (katalog "konut"): friesenhaus 1, doppelhaus 2, reihenhaus 4, mehrfamilienhaus 8 birim/yapı. */
 export function housingOf(mahalle) {
   const mi = mahalle % cap("mahalle_per_ada");
   return catalog.konut.find((k) => k.son === undefined || mi <= k.son);

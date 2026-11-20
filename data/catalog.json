@@ -1,11 +1,11 @@
 {
   "surum": 1,
-  "kapasite": {"daire_per_bina": 4, "bina_per_sokak": 10, "sokak_per_mahalle": 10, "mahalle_per_ada": 50},
+  "kapasite": {"daire_per_bina": 4, "bina_per_sokak": 10, "sokak_per_mahalle": 10, "mahalle_per_ada": 44},
   "konut": [
-    {"tip": "cottage", "birim": 1, "son": 0},
-    {"tip": "twofamily", "birim": 2, "son": 2},
-    {"tip": "fourplex", "birim": 4, "son": 10},
-    {"tip": "apartments", "birim": 8}
+    {"tip": "friesenhaus", "birim": 1, "son": 0},
+    {"tip": "doppelhaus", "birim": 2, "son": 2},
+    {"tip": "reihenhaus", "birim": 4, "son": 10},
+    {"tip": "mehrfamilienhaus", "birim": 8}
   ],
   "vardiyalar": {
     "gunduz": {"bas": 540, "son": 1020},

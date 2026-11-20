@@ -1,16 +1,19 @@
-// Driftwood Island'ın biçimi: kıyı, arazi yüksekliği, ana yollar ve mahalle bölgeleri. Nüfustan bağımsızdır: ada
-// boş başladığında da tam hâliyle vardır; mahalleler buradaki bölgelere dolar (layout.js).
+// Insel Wattenoog'un biçimi: kıyı, arazi yüksekliği (kumullar, set, tuzlu bataklık, Watt), liman havuzu, ana yollar ve
+// mahalle bölgeleri. Nüfustan bağımsızdır: ada boş başladığında da tam hâliyle vardır; mahalleler buradaki bölgelere
+// dolar (layout.js).
 //
-// Koordinatlar: x doğu, z güney, metre; (0,0) Town Green'in ortası. Ada bir hilal: ana gövde (elips) eksi güneye
-// açık Harbor Bay (elips); doğu boynuzu Bluff Head (fundalık yamaç), batı boynuzu kum dili ve ucunda Gull Point Light.
-// Kasaba koyun kuzey kıyısında (Water Street, Main Street, Town Green); dış (kuzey) kıyıda Ocean Beach ve kumullar.
+// Koordinatlar: x doğu, z güney, metre; (0,0) Marktplatz'ın ortası. Ada doğu–batı uzanan bir bariyer adası (Doğu Frizya
+// adaları gibi): kuzeyde açık Kuzey Denizi, kesintisiz geniş kumsal ve kumul kuşağı; güneyde Wattenmeer (gelgitle kuruyan
+// sığ deniz), tuzlu bataklık (Salzwiese) ve onu köyden ayıran set (Deich). Liman güney kıyıda, moloz dalgakıranlı bir havuz;
+// feribot güneye (anakaraya) kanal boyunca gider. Batı ucunda yüksek kumul (Westkopf) ve deniz feneri; doğuya doğru ada
+// incelir ve uzun bir kum burnu (Ostplate, kuş koruma alanı) olur. Köy merkezi limanla kumsal arasında: Marktplatz'tan
+// kuzeye Strandstraße (yaya bölgesi) Kurhaus'a ve sahil yoluna çıkar.
 import { fbm, hash2 } from "./noise.js";
 import SAVED_ZONES from "./zones.json" with { type: "json" };
 
 export const FLAT_Y = 1.2;
 
-const BODY = { x: 0, z: -460, rx: 3300, rz: 1300 };
-const BAY = { x: 60, z: 920, rx: 1450, rz: 760 };
+const BODY = { x: -300, z: -420, rx: 3650, rz: 1230 };
 export const HUB = [0, 0];
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -36,50 +39,75 @@ function smax(a, b, k) {
   return Math.max(a, b) + h * h * k * 0.25;
 }
 
-/** Koyun iç kıyısı (gürültüsüz): x'teki kıyı çizgisinin z'si. Kasaba ve rıhtımlar buna göre dizilir. */
-export function shoreZ(x) {
-  const u = (x - BAY.x) / BAY.rx;
-  return BAY.z - BAY.rz * Math.sqrt(Math.max(0, 1 - u * u));
+/** Güney (Watt) kıyısı, gürültüsüz: x'teki kıyı çizgisinin z'si. */
+export function southShoreZ(x) {
+  const u = (x - BODY.x) / BODY.rx;
+  return BODY.z + BODY.rz * Math.sqrt(Math.max(0, 1 - u * u));
+}
+/** Kuzey (açık deniz) kıyısı, gürültüsüz. */
+export function northShoreZ(x) {
+  const u = (x - BODY.x) / BODY.rx;
+  return BODY.z - BODY.rz * Math.sqrt(Math.max(0, 1 - u * u));
 }
 
-/** Main Street'in eksen çizgisi: kıyıdan 106 m içeride (Green'in güney kenarından geçer). */
-export const MAIN_X = [-430, 480];
-export const mainZ = (x) => shoreZ(x) - 106;
-/** Water Street: kıyıdan 30 m içeride. */
-export const waterZ = (x) => shoreZ(x) - 30;
-
-// Yapay dolgu: yük terminali ve tersanenin düz rıhtımları.
-const PADS = [
-  { x0: 590, x1: 735, z0: 150, z1: 268 }, // Freight terminal
-  { x0: -1010, x1: -890, z0: 300, z1: 430 }, // Boatyard
+// --- liman (Hafen) ---
+// Havuz kıyıdan içeri kazılmış; kuzey rıhtımı (Hafenkante) z = 640, batı ve doğu duvarları x = −160 / 320. İki moloz
+// dalgakıran güneye uzanıp ağızda (x 40…150) birbirine döner. Feribot iskelesi havuzun doğu yarısında, Kutterhafen batı
+// yarısında. Ağızdan güneye taranmış kanal (Fahrrinne): feribot gelgitten bağımsız işler.
+export const HAFEN = { x0: -160, x1: 320, z0: 640, mouth: [40, 150], moleZ: 916, kanalX: 95 };
+const MOLES = [
+  [-172, 760, -172, 902], [-172, 902, 30, 916], // batı mendirek
+  [332, 760, 332, 902], [332, 902, 160, 916], // doğu mendirek
 ];
+/** Hafenstraße: havuzun kuzeyinde, rıhtıma paralel (z = 600). */
+export const HAFEN_Z = 600;
+
+// --- Strandstraße: Marktplatz'tan kumsala (yaya bölgesi; ilk ~450 m dükkân, sonra Kurviertel villaları) ---
+export const STRAND = [[0, -45], [-6, -330], [-20, -720], [-14, -1110], [0, -1490]];
+/** Kurhaus ve sahil yolu (Promenade): kumulların ilk sırasının arkası (kuzey kıyıdan 150 m içeride). */
+export const PROMENADE_X = [-640, 560];
+export const promenadeZ = (x) => northShoreZ(x) + 150;
+
+// Gelgit kıyısı: güney kıyıda tuzlu bataklık şeridi (kıyı ile set arası) ve set (Deich). Liman çevresinde set yok
+// (rıhtım duvarları ve yükseltilmiş köy).
+export const DEICH = { ic: 105, taban: 44, tepe: 4, h: 4.6 }; // kıyıdan iç mesafe (merkez), taban genişliği, tepe, yükseklik
+const DEICH_ARALIK = [[-2700, -320], [420, 2300]];
+/** Setin bu x'te olup olmadığı (0..1, uçlarda yumuşak). */
+export function deichAt(x) {
+  let w = 0;
+  for (const [a, b] of DEICH_ARALIK) w = Math.max(w, smooth((x - a) / 80) * smooth((b - x) / 80));
+  return w;
+}
+/** Set merkez çizgisinin z'si. */
+export const deichZ = (x) => southShoreZ(x) - DEICH.ic;
 
 function boxIn(x, z, b) {
   return Math.min(x - b.x0, b.x1 - x, z - b.z0, b.z1 - z);
 }
 
-/** Kasaba kıyısında kıyı gürültüsü yok (rıhtımlar ve sokaklar kıyıya göre dizilir). */
+/** Köy ve liman kıyısında kıyı gürültüsü yok (rıhtımlar ve sokaklar kıyıya göre dizilir). */
 function quiet(x, z) {
-  const along = smooth((x + 1250) / 120) * smooth((1000 - x) / 120);
-  const near = smooth((170 - Math.abs(z - shoreZ(x))) / 80);
+  const along = smooth((x + 1000) / 160) * smooth((1000 - x) / 160);
+  const near = smooth((260 - Math.abs(z - southShoreZ(x))) / 120);
   return along * near;
 }
 
 const landCache = new Map();
 /** Kara içi uzaklık (metre, yaklaşık): + karada, kıyıda 0, − denizde. */
 export function land(x, z) {
-  // Anahtar 1/16 m çözünürlükte: tam metreye yuvarlanınca hücredeki ilk sorgunun değeri bütün hücreye dönüyordu
-  // (kıyı çizgisi 1 m'lik basamaklar yapıyor, rıhtım duvarı 5 m'de bir ileri geri kırılıyordu; sonuç sorgu
-  // sırasına bağlıydı).
+  // Anahtar 1/16 m (Driftwood dersi: 1 m yuvarlama kıyıyı basamaklıyordu).
   const key = Math.round(x * 16) * 1048576 + Math.round(z * 16);
   let d = landCache.get(key);
   if (d !== undefined) return d;
   d = -ellipseSd(x, z, BODY);
-  d = Math.min(d, ellipseSd(x, z, BAY));
-  d = smax(d, -capsuleSd(x, z, 1660, 120, 1440, 820, 190), 120); // Bluff Head
-  d = smax(d, -capsuleSd(x, z, -1820, 300, -1240, 1010, 55), 60); // kum dili (fener)
-  d += fbm(x / 170, z / 170, 5) * 70 * (1 - quiet(x, z));
-  for (const p of PADS) d = Math.max(d, Math.min(boxIn(x, z, p), 60));
+  d = smax(d, -capsuleSd(x, z, 1800, -440, 3750, -680, 250), 170); // doğu: incelen gövde
+  d = smax(d, -capsuleSd(x, z, 3650, -660, 4600, -780, 95), 80); // Ostplate kum burnu
+  d = smax(d, -capsuleSd(x, z, -3550, -480, -3100, -420, 470), 200); // batı başı (Westkopf)
+  d += fbm(x / 190, z / 190, 5) * 55 * (1 - quiet(x, z));
+  // Liman havuzu: kıyıdan içeri kazılmış (kuzey rıhtımı z0), dalgakıranlar sonradan eklenir.
+  const basin = boxIn(x, z, { x0: HAFEN.x0, x1: HAFEN.x1, z0: HAFEN.z0, z1: 900 });
+  d = Math.min(d, -basin);
+  for (const [ax, az, bx, bz] of MOLES) d = Math.max(d, -capsuleSd(x, z, ax, az, bx, bz, 9));
   if (landCache.size > 400000) landCache.clear();
   landCache.set(key, d);
   return d;
@@ -88,47 +116,39 @@ export function land(x, z) {
 // --- ayrılmış alanlar (mahalle kurulmaz) ---
 
 export const RESERVES = {
-  town: { x0: -480, x1: 540, z0: -150, z1: 900 }, // Green, Main Street, Water Street, rıhtımlar (güneyi deniz)
-  bog: { x0: -1320, x1: -760, z0: -560, z1: 300 }, // kızılcık bataklıkları, elma bahçesi, ahır
-  field: { x0: -470, x1: -190, z0: -380, z1: -150 }, // lise ve Gulls Field (kasabanın kuzeybatısı)
-  pond: { x: 640, z: -470, r: 120 }, // Kettle Pond parkı
-  bluff: { x: 1640, z: 120, r: 480 }, // Bluff Head fundalığı
-  spit: { x0: -1950, x1: -1150, z0: 180, z1: 1100 }, // kum dili ve fener
-  marina: { x0: -1150, x1: -480, z0: 160, z1: 900 }, // marina, balıkçı iskelesi, tersane
-  services: { x0: -730, x1: -480, z0: -120, z1: 160 }, // itfaiye ve belediye garajı (Lighthouse Road)
+  town: { x0: -430, x1: 470, z0: -560, z1: 660 }, // Marktplatz, Strandstraße'nin dükkânlı kısmı, Hafenweg, kilise, Rathaus
+  kur: { x0: -170, x1: 170, z0: -1560, z1: -560 }, // Strandstraße'nin Kurviertel kısmı (villalar), Kurhaus
+  hafen: { x0: -760, x1: 980, z0: 580, z1: 1000 }, // liman, Bootswerft (batı), Versorgungshafen (doğu)
+  polder: { x0: 1950, x1: 3000, z0: -260, z1: 900 }, // set arkası tarlalar, çiftlik, yel değirmeni
+  wasserturm: { x: -560, z: -1060, r: 100 }, // kumul üstünde su kulesi ve seyir yeri
+  westkopf: { x: -3280, z: -560, r: 470 }, // batı başı: yüksek kumul, deniz feneri, fener bekçisinin evi
+  ostplate: { x0: 3000, x1: 4700, z0: -1300, z1: 600 }, // doğu ucu: kuş koruma alanı, kum burnu
 };
 
-/** Dış kıyıya (kuzey) uzaklık: kumullar ve plaj şeridi. */
-export function northShoreZ(x) {
-  const u = (x - BODY.x) / BODY.rx;
-  return BODY.z - BODY.rz * Math.sqrt(Math.max(0, 1 - u * u));
-}
-
-/** late: 25. mahalleden sonra kumulların iç kenarı ve fundalığın dış halkası da kullanılabilir (ada doluyor). */
+/** late: 25. mahalleden sonra kumul kuşağının iç kenarı da kullanılabilir (ada doluyor). */
 export function inReserve(x, z, pad = 0, late = false) {
   const R = RESERVES;
-  for (const k of ["town", "bog", "field", "spit", "marina", "services"]) {
+  for (const k of ["town", "kur", "hafen", "polder", "ostplate"]) {
     const b = R[k];
     if (x > b.x0 - pad && x < b.x1 + pad && z > b.z0 - pad && z < b.z1 + pad) return k;
   }
-  if (Math.hypot(x - R.pond.x, z - R.pond.z) < R.pond.r + pad) return "pond";
-  if (Math.hypot(x - R.bluff.x, z - R.bluff.z) < (late ? 320 : R.bluff.r) + pad) return "bluff";
-  if (z < northShoreZ(x) + (late ? 105 : 160) + pad) return "dunes";
+  if (Math.hypot(x - R.wasserturm.x, z - R.wasserturm.z) < R.wasserturm.r + pad) return "wasserturm";
+  if (Math.hypot(x - R.westkopf.x, z - R.westkopf.z) < R.westkopf.r + pad) return "westkopf";
+  if (z < northShoreZ(x) + (late ? 200 : 260) + pad) return "dunes";
+  // Set ve önündeki tuzlu bataklık: kıyıdan setin iç eteğine (+ 25 m güvenlik) kadar.
+  if (deichAt(x) > 0.05 && z > deichZ(x) - DEICH.taban / 2 - 10 - pad) return "deich";
   return null;
 }
 
-// --- ana yollar (kasabadan dışa; mahalleler bunların iki yanına dizilir) ---
-
-const MX0 = MAIN_X[0], MX1 = MAIN_X[1];
+// --- ana yollar (köyden dışa; mahalleler bunların iki yanına dizilir) ---
+// Strandstraße yaya bölgesi olduğu için araç trafiği köyün çevresinden: Westerweg (batıya, fenere), Ostdorfer Straße
+// (doğuya, polderin kuzeyinden), Dünenweg (kuzeybatıya, kumul kuşağı boyunca), Kurstraße (kuzeydoğuya, Kurviertel'in
+// doğusundan kumullara).
 export const TRUNKS = [
-  // Pond Road: Green'in kuzeydoğu köşesinden Kettle Pond'un batısından kumullara.
-  { id: "pond", name: "Pond Road", pts: [[90, -58], [170, -190], [330, -330], [470, -470], [520, -700], [560, -950], [600, -1420]] },
-  // Beach Road: Green'in kuzeybatı köşesinden okyanus plajına.
-  { id: "beach", name: "Beach Road", pts: [[-90, -58], [-110, -230], [-115, -480], [-100, -800], [-90, -1100], [-80, -1520]] },
-  // Bluff Road: Main Street'in doğu ucundan Bluff Head'e.
-  { id: "bluff", name: "Bluff Road", pts: [[MX1, mainZ(MX1)], [640, 70], [830, -10], [1050, -60], [1250, -40], [1450, 40]] },
-  // Lighthouse Road: Main Street'in batı ucundan iç kesimden kum diline.
-  { id: "light", name: "Lighthouse Road", pts: [[MX0, mainZ(MX0)], [-560, 60], [-760, 20], [-1050, 0], [-1450, 60], [-1700, 260]] },
+  { id: "west", name: "Westerweg", pts: [[-130, 20], [-520, 60], [-1000, 80], [-1550, 40], [-2150, -80], [-2750, -260]] },
+  { id: "ost", name: "Ostdorfer Straße", pts: [[130, 20], [480, -20], [850, -120], [1250, -260], [1700, -420], [2200, -560], [2700, -640], [3050, -700]] },
+  { id: "duene", name: "Dünenweg", pts: [[-110, -110], [-260, -500], [-560, -880], [-1000, -1020], [-1550, -1080], [-2200, -1060], [-2650, -980]] },
+  { id: "kur", name: "Kurstraße", pts: [[110, -110], [300, -500], [480, -880], [820, -1060], [1350, -1120], [1950, -1020], [2450, -880]] },
 ];
 
 /** Polilin üstünde s uzunluğundaki nokta ve birim teğet. */
@@ -159,12 +179,12 @@ export function polyLength(pts) {
 
 export const ZONE = { pitch: 60, row0: 30, avenue: 7, strip: 27, side: 7, depth: 310 };
 
-/** Konut tipinin ölçüleri: sokakta bir yandaki ev sayısı, ev cephesi (parsel genişliği). */
+/** Konut tipinin ölçüleri: sokakta bir yandaki yapı sayısı, yapı cephesi (parsel genişliği). */
 export const HOUSE = {
-  cottage: { perSide: 20, lot: 14 },
-  twofamily: { perSide: 10, lot: 16 },
-  fourplex: { perSide: 5, lot: 22 },
-  apartments: { perSide: 3, lot: 34 },
+  friesenhaus: { perSide: 20, lot: 14 },
+  doppelhaus: { perSide: 10, lot: 16 },
+  reihenhaus: { perSide: 5, lot: 22 },
+  mehrfamilienhaus: { perSide: 3, lot: 34 },
 };
 
 export function streetLength(tip) {
@@ -217,7 +237,7 @@ function trunkSamples() {
 
 function zoneFits(c, placed) {
   const hw = c.hw, D = ZONE.depth;
-  // Kenar örnekleri: karada (kıyıdan 55 m içeride), ayrılmış alanların dışında.
+  // Kenar örnekleri: karada (kıyıdan 45 m içeride), ayrılmış alanların dışında.
   for (let u = -hw; u <= hw + 0.1; u += Math.min(40, hw)) {
     for (let v = 0; v <= D + 0.1; v += 50) {
       const [x, z] = zoneToWorld(c, u, v);
@@ -225,8 +245,7 @@ function zoneFits(c, placed) {
       if (inReserve(x, z, 12, c.m >= 25)) return false;
     }
   }
-  // Diğer bölgelerle çakışma: dikdörtgenler arasında en az 3 m (yollar bölgelerin içinde, kenara 7 m). Kesin test:
-  // döndürülmüş iki dikdörtgende ayırma ekseni (SAT), her biri 1,5 m büyütülmüş.
+  // Diğer bölgelerle çakışma: dikdörtgenler arasında en az 3 m (SAT, her biri 1,5 m büyütülmüş).
   for (const o of placed) {
     if (Math.hypot(o.cx - c.cx, o.cz - c.cz) > o.r + c.r + 10) continue;
     if (rectsOverlap(c, o, 1.5)) return false;
@@ -254,9 +273,9 @@ export function zoneEdges(z) {
 let zoneCache = null;
 
 /**
- * 50 mahalle bölgesinin yeri (ada başına; sonraki adalar aynı planı kullanır). Sırayla, kasabaya en yakın sığan
- * yere: bir ana yolun ya da önceki bir mahallenin çevre yolunun yanına (giriş kenarı yolun 11 m yanında, yola teğet).
- * Kasaba böylece yollar boyunca bitişik büyür. typeOf(m) → konut tipi ("cottage", ...).
+ * 50 mahalle bölgesinin yeri (ada başına; sonraki adalar aynı planı kullanır). Sırayla, köye en yakın sığan yere: bir
+ * ana yolun ya da önceki bir mahallenin çevre yolunun yanına (giriş kenarı yolun 11 m yanında, yola teğet).
+ * typeOf(m) → konut tipi ("friesenhaus", ...).
  */
 export function zones(count, typeOf) {
   if (zoneCache && zoneCache.length >= count) return zoneCache;
@@ -272,7 +291,6 @@ export function computeZones(count, typeOf) {
     const tip = typeOf(m), hw = zoneHalfWidth(tip);
     const roads = TRUNKS.map((tr) => ({ pts: tr.pts, sides: [-1, 1], id: tr.id }));
     for (const o of placed) for (const [k, e] of zoneEdges(o).entries()) roads.push({ pts: e.pts, out: e.out, id: `m${o.m}:${k}` });
-    // Adaylar maliyete göre (eşitlikte üretim sırasıyla) denenir; ilk sığan en ucuzdur.
     const cands = [];
     for (const rd of roads) {
       const L = polyLength(rd.pts);
@@ -285,12 +303,11 @@ export function computeZones(count, typeOf) {
           const n = [-tt[1] * side, tt[0] * side];
           if (rd.out && n[0] * rd.out[0] + n[1] * rd.out[1] < 0.5) continue; // bölge yolu: yalnız dış yana
           const ox = p[0] + n[0] * 11, oz = p[1] + n[1] * 11;
-          // Yerel u ekseni: v (n) ile sağ el sistemi olsun diye yana göre çevrilir.
           const c = { m, tip, hw, ox, oz, t: side > 0 ? tt : [-tt[0], -tt[1]], n, road: rd.id, s, side };
           [c.cx, c.cz] = zoneToWorld(c, 0, ZONE.depth / 2);
           c.r = Math.hypot(hw, ZONE.depth / 2);
-          // Kasabaya yakınlık; kuzey-güney biraz ağır (önce koy boyu, sonra içeri).
-          c.cost = Math.hypot(c.cx, c.cz * 1.15) + hash2(m, Math.round(s), 91) * 4;
+          // Köye yakınlık; doğu–batı biraz hafif (ada uzun ve dar: köy önce yollar boyunca uzar).
+          c.cost = Math.hypot(c.cx * 0.9, c.cz * 1.2) + hash2(m, Math.round(s), 91) * 4;
           c.i = cands.length;
           cands.push(c);
         }
@@ -307,25 +324,41 @@ export function computeZones(count, typeOf) {
 
 // --- arazi yüksekliği ---
 
-/** Bluff Head'in fundalık tepesi ve batıdaki hafif tepeler; kasaba ve mahalleler düz (FLAT_Y). */
+const WESTKOPF = { x: -3250, z: -560, r: 320, h: 19 };
+export const WASSERTURM = { x: -560, z: -1060, r: 55, h: 10 };
+
+/** Doğal yükseklik (FLAT_Y üstü): kumul kuşağı ve dağınık kumul tepecikleri, Westkopf, su kulesi kumulu. Köy düz. */
 export function naturalHeight(x, z) {
-  let h = Math.max(0, fbm(x / 110, z / 110, 3)) * 7;
-  const bx = x - 1680, bz = z - 120;
-  h += Math.exp(-(bx * bx + bz * bz) / (2 * 260 * 260)) * (26 + 6 * fbm(x / 60, z / 60, 11));
-  // Kumullar: dış kıyıdan 25–190 m içeride, rüzgârla uzamış tepecikler.
+  let h = Math.max(0, fbm(x / 120, z / 120, 3)) * 2.5;
+  // Kumul kuşağı: dış kıyıdan 70–330 m içeride; ilk sıra (Weißdüne) en yüksek, içe doğru alçalan Graudüne.
   const dn = z - northShoreZ(x);
-  if (dn > 15 && dn < 230) {
-    const env = smooth((dn - 15) / 40) * smooth((230 - dn) / 70);
-    h += env * (2.2 + (fbm(x / 38, z / 16, 17) + 0.5) * 5.5);
+  if (dn > 55 && dn < 340) {
+    const env = smooth((dn - 55) / 35) * smooth((340 - dn) / 110);
+    const ilk = Math.exp(-(((dn - 120) / 42) ** 2));
+    h += env * (2.5 + (fbm(x / 34, z / 15, 17) + 0.5) * (4 + 7 * ilk));
   }
+  const wk = Math.exp(-((x - WESTKOPF.x) ** 2 + (z - WESTKOPF.z) ** 2) / (2 * WESTKOPF.r ** 2));
+  h += wk * (WESTKOPF.h + 4 * fbm(x / 50, z / 50, 11));
+  const wt = Math.exp(-((x - WASSERTURM.x) ** 2 + (z - WASSERTURM.z) ** 2) / (2 * WASSERTURM.r ** 2));
+  h += wt * WASSERTURM.h;
   return h;
 }
 
-/** 0..1: arazi ne kadar düzlenmiş (kasaba, mahalle bölgeleri, tarlalar). Izgarada önceden hesaplanır. */
+/** Set profili (FLAT_Y üstü, metre): trapez; tepede 4 m düz yürüyüş yolu, iki yana 1:4,5 şev. */
+export function deichHeight(x, z) {
+  const w = deichAt(x);
+  if (w <= 0) return 0;
+  const e = Math.abs(z - deichZ(x));
+  const half = DEICH.taban / 2, top = DEICH.tepe / 2;
+  if (e >= half) return 0;
+  return w * DEICH.h * (e <= top ? 1 : smooth((half - e) / (half - top)));
+}
+
+/** 0..1: arazi ne kadar düzlenmiş (köy, mahalle bölgeleri, tarlalar). Izgarada önceden hesaplanır. */
 let flatGrid = null;
 export function setFlatAreas(rects) {
   // rects: [{poly: [[x,z]...]}] (dışbükey dörtgenler); 10 m ızgara, 30 m yumuşak kenar.
-  const S = 10, X0 = -2900, Z0 = -1600, NX = 580, NZ = 290;
+  const S = 10, X0 = -4100, Z0 = -1750, NX = 900, NZ = 300;
   const g = new Float32Array(NX * NZ);
   const inside = (poly, x, z) => {
     let d = Infinity;
@@ -336,7 +369,6 @@ export function setFlatAreas(rects) {
     }
     return d;
   };
-  // Her çokgen yalnız kendi sınır kutusundaki (+40 m) hücreleri günceller.
   for (const r of rects) {
     const xs = r.poly.map((q) => q[0]), zs = r.poly.map((q) => q[1]);
     const i0 = clamp(Math.floor((Math.min(...xs) - 40 - X0) / S), 0, NX - 1), i1 = clamp(Math.ceil((Math.max(...xs) + 40 - X0) / S), 0, NX - 1);
@@ -363,31 +395,86 @@ export function flatness(x, z) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-/** Kasaba kıyısı rıhtım mı (0..1)? Koy boyunca x −1000…800: kumsal yerine taş rıhtım duvarı. */
+/** Liman kıyısı rıhtım mı (0..1)? Havuzun duvarları ve iki yanındaki rıhtımlar (x −760…980): kumsal yerine taş duvar. */
 export function quay(x, z) {
-  return quiet(x, z) * smooth((x + 1000) / 30) * smooth((800 - x) / 30);
+  return quiet(x, z) * smooth((x + 760) / 30) * smooth((980 - x) / 30) * smooth((z - 560) / 30);
 }
 
-/** Doğal arazi (tesviyesiz): kıyıda denize iner, Bluff Head kıyısı sarp (kaya), kasaba önünde rıhtım duvarı. */
+// --- deniz tabanı: gelgit (gelgit seviyesi deniz.js; ortalama 0, ±~0,9 m) ---
+/** Tuzlu bataklık yüksekliği (mutlak): bahar gelgitinin yüksek suyunda kısmen su basar. */
+export const SALZWIESE_Y = 0.72;
+/** Watt düzlüğünün yüksekliği (mutlak): alçak suda kurur. */
+export const WATT_Y = -0.5;
+
+// Priele: Watt'ta alçak suda da ıslak kalan kıvrımlı kanallar (yaklaşık polilinler; genişlik ve derinlik).
+const PRIELE = [
+  { w: 34, pts: [[95, 916], [80, 1100], [140, 1350], [60, 1650], [120, 2100], [60, 2700]] }, // Fahrrinne (taranmış kanal)
+  { w: 22, pts: [[-1400, 820], [-1300, 1020], [-1500, 1300], [-1350, 1700], [-1600, 2300]] },
+  { w: 18, pts: [[1300, 900], [1450, 1150], [1350, 1450], [1600, 1800], [1500, 2400]] },
+  { w: 14, pts: [[-600, 920], [-700, 1100], [-560, 1350], [-760, 1600]] },
+  { w: 12, pts: [[2500, 500], [2700, 760], [2600, 1060], [2900, 1400]] },
+];
+function prielDist(x, z) {
+  let best = Infinity;
+  for (const p of PRIELE) {
+    for (let i = 1; i < p.pts.length; i++) {
+      const [ax, az] = p.pts[i - 1], [bx, bz] = p.pts[i];
+      const vx = bx - ax, vz = bz - az;
+      const t = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz), 0, 1);
+      best = Math.min(best, Math.hypot(x - ax - vx * t, z - az - vz * t) / (p.w / 2));
+    }
+  }
+  return best; // 1 = kanal kenarı
+}
+/** Seehundbank: Watt'ta alçak suda kuruyan kum adası (foklar orada yatar). */
+export const SEEHUNDBANK = { x: 1850, z: 1550, rx: 380, rz: 110 };
+
+/** Deniz tabanı (mutlak yükseklik): kuzeyde hızla derinleşen açık deniz, güneyde sığ Watt + Priele + Seehundbank. */
+function seabed(x, z, L) {
+  const north = z < BODY.z ? smooth((BODY.z - z) / 400) : 0; // ada ekseninin kuzeyi açık deniz
+  const open = Math.max(-14, -0.4 + L * 0.06);
+  const pd = prielDist(x, z);
+  let watt = WATT_Y + fbm(x / 140, z / 140, 23) * 0.22;
+  if (pd < 2.2) watt = Math.min(watt, -0.5 - 2.4 * smooth(1 - (pd - 0.6) / 1.6));
+  const sb = ((x - SEEHUNDBANK.x) / SEEHUNDBANK.rx) ** 2 + ((z - SEEHUNDBANK.z) / SEEHUNDBANK.rz) ** 2;
+  if (sb < 1) watt = Math.max(watt, -0.15 + 0.12 * smooth(1 - sb));
+  // Kıyıdan Watt'a yumuşak iniş (ilk 40 m), uzakta (z > 2600) derinleşir.
+  watt = Math.max(watt, Math.min(0.3, L * 0.03)) - smooth((z - 2600) / 600) * 6;
+  return north * open + (1 - north) * watt;
+}
+
+/** Doğal arazi (tesviyesiz): kuzeyde kumsala iner, güneyde tuzlu bataklık + set, liman önünde rıhtım duvarı. */
 export function terrainHeight(x, z) {
   const L = land(x, z);
   const f = flatness(x, z);
   const q = quay(x, z);
-  // Rıhtımın arkası düz (duvar başlığı arazinin hemen üstünde kalsın): doğal tümsekler kıyıdan 20–45 m içeride söner.
-  let h = FLAT_Y + naturalHeight(x, z) * (1 - f) * (1 - q * smooth((45 - L) / 25));
-  const bluff = Math.exp(-((x - 1680) ** 2 + (z - 120) ** 2) / (2 * 330 * 330));
-  // Bluff'ta kıyı şeridi dar; rıhtımda arazi kıyı çizgisinin 0,5 m içinde, duvarın (1 m kalınlık, kıyı çizgisinde)
-  // altında iner: duvarın kara yüzü açıkta kalmaz.
-  const band = (40 - 26 * bluff) * (1 - q) + 0.5 * q;
+  let h = FLAT_Y + naturalHeight(x, z) * (1 - f) * (1 - q * smooth((45 - L) / 25)) + deichHeight(x, z);
   if (q > 0.9) {
-    // Rıhtım: kıyı çizgisinin 0,5 m içine (duvarın kara yüzü) kadar tam yükseklik, sonra 0,2 m'de duvarın dibine.
+    // Rıhtım: kıyı çizgisinin 0,5 m içine kadar tam yükseklik, sonra duvarın dibine (havuz tabanı −1,0).
     const t = clamp((0.5 - L) / 0.2, 0, 1);
-    return L >= 0.5 ? h : h * (1 - t) - 2.5 * t + Math.min(0, L) * 0.06;
+    return L >= 0.5 ? h : h * (1 - t) - 1.0 * t + Math.min(0, L) * 0.02;
   }
+  const southSide = z > BODY.z;
+  if (southSide && deichAt(x) > 0.05 && L >= 0) {
+    // Setin önü (deniz tarafı): tuzlu bataklık; set eteğinden kıyıya alçalır, kıyıda Watt'a 1 m'lik kenar.
+    const e = deichZ(x) - z + DEICH.taban / 2; // set eteğinden denize doğru (−: setin iç tarafı)
+    if (e < 0) {
+      const w = deichAt(x), marsh = SALZWIESE_Y + fbm(x / 30, z / 30, 31) * 0.12;
+      const s = smooth(-e / 18), edge = smooth(L / 6);
+      return (h * (1 - s) + marsh * s) * w * edge + (1 - w * edge) * (L < 6 ? WATT_Y + 1.2 * smooth(L / 6) : h);
+    }
+  }
+  const band = southSide ? 30 : 95; // kuzeyde geniş kumsal (gelgitle su çizgisi ~50 m oynar)
   if (L >= band) return h;
   if (L >= 0) {
     const t = 1 - L / band;
-    return h * (1 - smooth(t)) - 0.3 * t - 2.2 * q * t;
+    return h * (1 - smooth(t)) + (southSide ? 0.1 : -0.2) * t;
   }
-  return Math.max(-12, (-0.3 + L * 0.12) * (1 - q) + (-2.5 + L * 0.06) * q);
+  return Math.max(seabed(x, z, L), southSide ? -12 : -14) + (L > -40 ? 0 : 0);
 }
+
+// --- geçici uyum (Aşama 5'te kaldırılacak): Driftwood yerleşim kodunun beklediği adlar ---
+export const shoreZ = southShoreZ;
+export const MAIN_X = [-430, 480];
+export const mainZ = () => HAFEN_Z - 30;
+export const waterZ = () => HAFEN_Z;

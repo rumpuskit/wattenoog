@@ -326,7 +326,7 @@ export class Dollhouse {
 
   /**
    * Dairenin planı (çizimsiz): sütunlar, odalar, eşya duvarları ve giriş. Dar dairede tek sütun: odalar önden
-   * arkaya, eşyalar iki yan duvarda (A ana eşyalar, B karşısı). Geniş dairede (cottage, apartmanın sağ dairesi)
+   * arkaya, eşyalar iki yan duvarda (A ana eşyalar, B karşısı). Geniş dairede (friesenhaus, apartmanın sağ dairesi)
    * iki sütun: yaşam (salon + mutfak) ve yatak tarafı (yatak, banyo, ikinci yatak), aralarında önde kapılı bölme;
    * iki sütunun da A duvarı bölmedir. Çekirdek duvarındaki giriş kapısı eşyaların boş bıraktığı yere konur:
    * eşyalar önce kuru çalıştırılıp kayda alınır, duvar boyunca boş aralık aranır, yoksa eşyalar aynalanıp
@@ -386,7 +386,7 @@ export class Dollhouse {
       P.coreDoor = { x: wallX, z };
       P.entry = { p: [wallX - unit.side * 0.6, z], heading: 0, ax: c0.ax };
     } else {
-      // Ön kapıdan (cottage, iki aileli evin zemin katı).
+      // Ön kapıdan (friesenhaus, iki aileli evin zemin katı).
       const fx = b.door?.x ?? 0;
       const col = P.cols.find((c) => fx > Math.min(c.x0, c.x1) && fx < Math.max(c.x0, c.x1)) ?? c0;
       P.entry = { p: [fx, zf - 0.6], heading: 0, ax: col.ax };

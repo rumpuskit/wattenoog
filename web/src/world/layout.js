@@ -137,10 +137,10 @@ export function islandZones() {
 // Konut tiplerinin yapı ölçüleri: Cape Cod kulübesi (tek katlı, çatı arası), iki aileli ev (2 kat, katta bir daire),
 // four-square (2 kat, katta iki daire), garden apartment (3 kat, katta üç daire; sonuncusunda iki).
 const HOUSE_DIMS = {
-  cottage: { w: 8.5, d: 9, floors: 1, perFloor: 1 },
-  twofamily: { w: 9, d: 13, floors: 2, perFloor: 1 },
-  fourplex: { w: 13, d: 13, floors: 2, perFloor: 2 },
-  apartments: { w: 28, d: 13, floors: 3, perFloor: 3 },
+  friesenhaus: { w: 8.5, d: 9, floors: 1, perFloor: 1 },
+  doppelhaus: { w: 9, d: 13, floors: 2, perFloor: 1 },
+  reihenhaus: { w: 13, d: 13, floors: 2, perFloor: 2 },
+  mehrfamilienhaus: { w: 28, d: 13, floors: 3, perFloor: 3 },
 };
 
 /** Main Street boyunca x'teki eksen noktası, teğeti ve koy tarafına bakan normali. */
@@ -1536,7 +1536,7 @@ export class World {
     const u = c * (I.ZONE.avenue + 3 + H.lot * (k + 0.5));
     const dims = HOUSE_DIMS[tip];
     const style = this.mahalleStyle(zone.m);
-    const yard = tip === "apartments" ? 4 : style.yard;
+    const yard = tip === "mehrfamilienhaus" ? 4 : style.yard;
     const rv = this._rowV(r), sgn = back ? 1 : -1;
     const v = rv + sgn * (ROADS.sokak.width / 2 + yard + dims.d / 2);
     const [x, z] = this._zw(zone, u, v);
@@ -1575,10 +1575,10 @@ export class World {
         const wall = HOUSE_WALLS[(style.tint + Math.floor(hash2(key, 3, 5) * 5)) % HOUSE_WALLS.length];
         const b = this.addBuilding({
           kind: "konut", house: tip, x: q.x, z: q.z, rot: q.rot, w: dims.w, d: dims.d, floors: dims.floors,
-          perFloor: dims.perFloor, daireler: birim, slot0, yard: tip === "apartments" ? 4 : style.yard, pathSeed: key,
-          roofType: tip === "fourplex" ? "hip" : "gable",
+          perFloor: dims.perFloor, daireler: birim, slot0, yard: tip === "mehrfamilienhaus" ? 4 : style.yard, pathSeed: key,
+          roofType: tip === "reihenhaus" ? "hip" : "gable",
           wall, roof: HOUSE_ROOFS[Math.floor(hash2(key, 4, 5) * HOUSE_ROOFS.length)],
-          porch: tip !== "apartments", shutters: hash2(key, 6, 5) < 0.6, garage: tip === "cottage" && hash2(key, 7, 5) < 0.45,
+          porch: tip !== "mehrfamilienhaus", shutters: hash2(key, 6, 5) < 0.6, garage: tip === "friesenhaus" && hash2(key, 7, 5) < 0.45,
           address: streetAddress(slot0).replace(/, Apt \d+$/, ""),
         });
         this.buildingBySlot0.set(slot0, b);
@@ -1807,7 +1807,7 @@ export function rihtimNoktalari(wall, kesik) {
 
 /**
  * Konut katının planı: merdiven çekirdeği (2,4 m) ve daireler; birimler üst üste binmez. Tek katlı evde
- * (cottage) çekirdek yok, daire binanın tamamı. Katta tek daire varsa (iki aileli ev) çekirdek sol yan
+ * (friesenhaus) çekirdek yok, daire binanın tamamı. Katta tek daire varsa (iki aileli ev) çekirdek sol yan
  * duvarda (ön cephede merdiven kapısı onun önünde), daire kalan genişlik. Daha çok dairede çekirdek ortada,
  * daireler iki yana bölüştürülür (tek sayıda solda bir fazla: 28 m apartmanda solda iki, sağda bir geniş
  * daire). Katta ikiden fazla daire varsa arkada ortak koridor bulunur. Hem dış cephe hem iç mekân bunu kullanır.

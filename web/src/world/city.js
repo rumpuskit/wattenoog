@@ -566,7 +566,7 @@ function drawHouse(K, b, floors, full, addWindow) {
     for (let x = lx0 + 0.2; x < lx1 - 0.1; x += 0.25) B.trims.add(local(b, x, y + 0.12, z), b.rot, s.set(0.04, 0.75, 0.04), PORCH);
   };
 
-  if (tip === "cottage") {
+  if (tip === "friesenhaus") {
     // Cape Cod: ortada kapı ve iki yanında kepenkli pencereler; dik çatı, iki çatı penceresi, yan bacası.
     win(-2.4, 0.95, 1, 1.0, 1.35, unit(0, -1));
     win(2.4, 0.95, 1, 1.0, 1.35, unit(0, 1));
@@ -595,7 +595,7 @@ function drawHouse(K, b, floors, full, addWindow) {
     return;
   }
 
-  if (tip === "twofamily") {
+  if (tip === "doppelhaus") {
     // İki aileli ev: alınlık sokağa bakar; zemin ve üst kat birer daire, iki katlı ön veranda. Merdiven sol yan
     // duvar boyunca (unitLayout çekirdeği): önde merdiven kapısı, yanında zemin kat dairesinin kapısı.
     for (let f = 0; f < floors; f++) {
@@ -619,7 +619,7 @@ function drawHouse(K, b, floors, full, addWindow) {
     return;
   }
 
-  if (tip === "fourplex") {
+  if (tip === "reihenhaus") {
     // Four-square: her katta iki daire, boydan zemin kat verandası, kırma çatı ve ön çatı penceresi.
     for (let f = 0; f < floors; f++) {
       for (const lx of [-4.4, -2.0, 2.0, 4.4]) {
@@ -850,7 +850,7 @@ function buildFrontPaths(world) {
   ]), std("#c8231f", { roughness: 0.45 }));
   const BOXES = ["#1d1d20", "#1d1d20", "#2f4256", "#8e2f2a", "#f4f1ea"];
   for (const b of world.buildings) {
-    if (!b.house || b.house === "apartments") continue;
+    if (!b.house || b.house === "mehrfamilienhaus") continue;
     const seed = b.pathSeed ?? 1;
     const lz = b.d / 2 + b.yard + 0.35, lx = b.w / 2 + 1.0;
     mailPost.add(local(b, lx, -0.05, lz), b.rot, s.set(1, 1, 1));

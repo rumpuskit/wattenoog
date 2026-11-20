@@ -17,7 +17,7 @@ const OUT_LABELS = {
   meydan: "On the Town Green", park: "Strolling in the park", sahil_yolu: "Walking the Harbor Walk",
   kahvehane: "At the Diner", pazar: "Shopping at the Farmers Market", saha: "At Gulls Field",
 };
-const HOUSE_TYPES = { cottage: "Cottage", twofamily: "Two-family house", fourplex: "Fourplex", apartments: "Apartment building" };
+const HOUSE_TYPES = { friesenhaus: "Cottage", doppelhaus: "Two-family house", reihenhaus: "Fourplex", mehrfamilienhaus: "Apartment building" };
 // Unvan cümle içinde küçük harfle ("a baker"); kısaltmalar (JV) olduğu gibi kalır.
 const lower = (t) => t.replace(/\b[A-Z](?=[a-z])/g, (c) => c.toLowerCase());
 const aOrAn = (t) => (/^[aeiou]/i.test(t) ? "an " : "a ") + t;

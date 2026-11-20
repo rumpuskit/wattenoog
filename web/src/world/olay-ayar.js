@@ -1,82 +1,89 @@
-// Driftwood'un olay ayarları (olay-plan.js okur; Mercanada'da kendi dosyası).
-// Öğle videosu 18:30 Berlin = 12:30 ET; üretim 11:30 ET'de başlar: olay ondan önce (en geç ~11:20 ET) biter.
-// Ada küçük (araç yolu, itfaiye yok): şimdilik doğa olayları; kaza/yangın açılınca kendiliğinden listeye girer.
-/** Adanın adı (olay-plan.js tema düzeni: iki ada birlikte planlanır, TEMA_SIRA). */
+// Wattenoog'un olay ayarları (olay-plan.js okur; Mercanada ve Driftwood'un kendi dosyası var).
+// Ada saati Berlin saati. Öğle videosu 13:30 (üretim 12:30): sabah olayı en geç 12:20'de biter. Akşam videosu 20:00
+// (üretim 19:00): öğleden sonra olayı en geç 18:50'de biter (deniz olayları pencereleriyle gün ışığında başlar ve biter).
+// Türler Kuzey Denizi adasına uyanlar: geyik, köpekbalığı ve balina yok; fok = Seehunde (Seehundbank), yunus = Schweinswale.
+/** Adanın adı (olay-plan.js tema düzeni: üç ada birlikte planlanır, TEMA_SURUMLERI sira). */
 export const ADA = "wattenoog";
-export const ADA_TURLERI = ["firtina", "balina", "sis", "kaza", "yangin"];
-/** Başlangıç pencereleri [en erken, en geç] (ET dakikası). */
-export const PENCERE = { firtina: [450, 560], sis: [330, 380], balina: [480, 630], kaza: [480, 600], yangin: [480, 610], zeplin: [480, 600],
-  // --- ajan D ---
-  balon: [450, 600], ucurtma: [540, 620], kus: [480, 620], moose: [480, 630],
-  // --- ajan C (sabah pencereleri, SABAH_SON 11:20 ET öncesi biter) ---
-  film: [480, 620], yaris: [480, 630], marti: [480, 650],
-  // --- ajan E (kar, mevsimlik) ---
-  kar: [450, 560] };
-// --- ajan B --- liman/tekne olayları, sabah pencereleri (SABAH_SON 11:20'den önce biter).
-Object.assign(PENCERE, { vapur: [480, 650], balik: [480, 630], tekne_yarisi: [480, 640] });
-/** Sabah olayının en geç bitişi (ET dk): öğle üretimi 11:30 ET başlar; 11:20. */
-export const SABAH_SON = 680;
-/** Özel günler (olay yok): 4 Temmuz. */
+export const ADA_TURLERI = ["firtina", "sis", "yangin", "kaza", "fok"];
+/** Başlangıç pencereleri [en erken, en geç] (yerel dakika, Berlin). Sabah olayları SABAH_SON'dan (12:20) önce biter. */
+export const PENCERE = {
+  firtina: [510, 610], sis: [400, 450], yangin: [540, 650], kaza: [540, 660], zeplin: [560, 650],
+  fok: [540, 660], yunus: [540, 670], hortum: [560, 680], dalga: [530, 650], kar: [500, 600],
+  balon: [480, 620], ucurtma: [600, 670], kus: [540, 660], film: [560, 660], yaris: [560, 670], marti: [570, 700],
+  vapur: [540, 690], balik: [540, 670], tekne_yarisi: [540, 680], dugun: [580, 680], gemi: [560, 640],
+};
+/** Sabah olayının en geç bitişi (yerel dk): öğle üretimi 12:30'da başlar; 12:20. */
+export const SABAH_SON = 740;
+/** Özel günler (olay yok): Heiligabend, 1. Weihnachtstag, Silvester (ada bayram/özel videosu). */
 export function ozelGun(day) {
-  const d = new Date(day * 86400000);
-  return d.getUTCMonth() === 6 && d.getUTCDate() === 4;
+  const d = new Date(day * 86400000), m = d.getUTCMonth() + 1, g = d.getUTCDate();
+  return m === 12 && (g === 24 || g === 25 || g === 31);
 }
-/** Öğleden sonra olayı (17 Kasım akşamı, kullanıcı: "ikinci videolar da olay videosu olacak"): akşam videosu (23:30 Berlin
- *  = 17:30 ET, üretim 16:30 ET) anlatır. Sis yok; tür sabahkinden farklı. Yunuslar yalnız öğleden sonra (sabah listesinde
- *  yok: balinayla aynı gün iki deniz olayı olabilir ama tür farklı). Pencereler ET dakikası; kışın gün batımı ~16:20 ET:
- *  deniz olayları gün ışığında. son: en geç bitiş 15:50 ET (fırtınanın 20 dk gökkuşağı dahil üretimden ≥20 dk önce);
- *  ABD ile Avrupa yaz saati çoğunlukla birlikte değiştiği için yazSon aynı. */
+/** Öğleden sonra olayı: akşam videosu (20:00, üretim 19:00) anlatır. Sis yok; tür sabahkinden farklı. Başlangıç
+ *  pencereleri gün ışığında (kışın gün batımı ~16:10); son: en geç bitiş 18:50 (elektrik kesintisi gün batımından sonra,
+ *  ~27 Ekim–Şubat ortası sığar). Avrupa yaz saati ada saatinin kendisi: yazSon aynı. */
 export const IKINCI = {
-  turler: ["firtina", "balina", "yunus", "kaza", "yangin"],
-  pencere: { firtina: [720, 800], balina: [750, 860], yunus: [750, 870], kaza: [750, 880], yangin: [750, 870], zeplin: [720, 840],
-    balon: [720, 840], ucurtma: [720, 860], kus: [720, 860], moose: [720, 870], // ajan D
-    film: [750, 880], yaris: [750, 890], marti: [750, 920], // ajan C (son 15:50 ET öncesi)
-    kar: [720, 800] }, // ajan E
-  varsayilan: [740, 860], // penceresi yazılmamış tür (gün ışığında başlar)
-  son: 950,
-  yazSon: 950,
+  turler: ["firtina", "yangin", "kaza", "fok", "yunus"],
+  pencere: {
+    firtina: [790, 880], yangin: [800, 900], kaza: [800, 920], zeplin: [800, 900], fok: [810, 930], yunus: [810, 930],
+    hortum: [820, 930], dalga: [810, 920], kar: [790, 870], balon: [800, 900], ucurtma: [800, 905], kus: [810, 930],
+    film: [810, 920], yaris: [810, 930], marti: [820, 960], vapur: [800, 940], balik: [800, 930], tekne_yarisi: [800, 930],
+    dugun: [820, 930], elektrik: [940, 970],
+  },
+  varsayilan: [800, 920],
+  son: 1130,
+  yazSon: 1130,
 };
-// --- ajan B --- öğleden sonra pencereleri (gün ışığında biter; yarışta tekneler başlangıçtan 37 dk sonra açığa gider).
-Object.assign(IKINCI.pencere, { vapur: [740, 900], balik: [740, 880], tekne_yarisi: [740, 890] });
-/** Olay modüllerinin dili ve adları (olay-zeplin.js). Driftwood'un zeplini 150. sakinde açılır; o zamana dek inen
- *  zeplin adanın üstünden geçen yabancı bir zeplindir. */
-export const DIL = "en";
+/** Gün batımı (yerel dakika, Berlin; enlem 53,75° K, boylam 7,5° D; sky.js ile aynı yaklaşım): elektrik kesintisi
+ *  yalnız lambalar yandıktan sonra (olay-plan.js elektrikPenceresi). Saat farkı gününe göre (AB yaz saati). */
+export function gunBatimi(day) {
+  const rad = Math.PI / 180, LAT = 53.75 * rad, LON = 7.5, h = -0.833 * rad;
+  const y = new Date(day * 86400000).getUTCFullYear();
+  const sonPazar = (ay) => { const d = Date.UTC(y, ay + 1, 0) / 86400000; return d - new Date(d * 86400000).getUTCDay(); };
+  const TZ = day >= sonPazar(2) && day < sonPazar(9) ? 2 : 1;
+  const el = (m) => {
+    const n = day + 2440587.5 + (m / 60 - TZ) / 24 - 2451545.0;
+    const L = (280.46 + 0.9856474 * n) % 360, g = (357.528 + 0.9856003 * n) * rad;
+    const lam = (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * rad, eps = (23.439 - 0.0000004 * n) * rad;
+    const ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)), dec = Math.asin(Math.sin(eps) * Math.sin(lam));
+    const ha = ((18.697374558 + 24.06570982441908 * n) % 24) * 15 * rad + LON * rad - ra;
+    return Math.asin(Math.sin(LAT) * Math.sin(dec) + Math.cos(LAT) * Math.cos(dec) * Math.cos(ha));
+  };
+  let prev = el(720);
+  for (let m = 722; m <= 1440; m += 2) { const e = el(m); if (prev >= h && e < h) return m; prev = e; }
+  return 1440;
+}
+/** Olay modüllerinin dili ve adları. Wattenoog-Zeppelin 150. sakinde açılır; o zamana dek inen zeplin adanın üstünden
+ *  geçen yabancı bir reklam zeplinidir. */
+export const DIL = "de";
 export const ZEPLIN = {
-  kendi: { ad: "the Driftwood Blimp" },
-  ziyaretci: { ad: "an ad blimp" },
-  saha: { ad: "the ball field" },
-  yedekSaha: { ad: "the Town Green" },
+  kendi: { ad: "der Wattenoog-Zeppelin" },
+  ziyaretci: { ad: "ein Werbezeppelin" },
+  saha: { ad: "der Sportplatz" },
+  yedekSaha: { ad: "der Marktplatz" },
 };
-/** Tür listesi sürümleri (olay-plan.js): yeni türler yalnız sürümün gününden itibaren takvime girer; önceki günler değişmez. */
-// 19 Kasım'dan itibaren HANGİ gün hangi türün çıkacağını olay-plan.js tema düzeni seçer (iki ada birlikte; 18 Kasım,
-// "aynı temada videolar peşpeşe"); buradaki listeler adanın o gün izinli türleridir.
+/** Tür listesi sürümleri (olay-plan.js): yeni türler yalnız sürümün gününden itibaren takvime girer; önceki günler değişmez.
+ *  22 Kasım'dan itibaren HANGİ gün hangi türün çıkacağını olay-plan.js tema düzeni seçer (üç ada birlikte). */
 export const TUR_SURUMLERI = [
-  // 19 Kasım: zeplin acil inişi (olay-zeplin.js; Driftwood'da zeplin açılana dek adanın üstünden geçen reklam zeplini).
-  // 19 Kasım: olay modülleri (17 Kasım akşamı, kullanıcı: "olay çeşitliliği ve dikkat çekicilik çok önemli"). Kar yalnız
-  // 1 Aralık–28 Şubat (gerek). komsu: öğleden sonra olayı komşu günlerin sabah olayından da farklı.
-  { gun: "2026-11-19", komsu: true,
-    sabah: [...ADA_TURLERI, "zeplin", "fok", "kopekbaligi", "hortum", "dalga", "kar", "kus", "moose", "marti", "film", "balik", "yaris", "balon", "vapur", "ucurtma", "tekne_yarisi"],
-    ikinci: [...IKINCI.turler, "zeplin", "fok", "kopekbaligi", "hortum", "dalga", "kar", "kus", "moose", "marti", "film", "balik", "yaris", "balon", "vapur", "ucurtma", "tekne_yarisi"] },
+  { gun: "2026-11-22", komsu: true,
+    sabah: ["firtina", "sis", "yangin", "kaza", "fok", "yunus", "zeplin", "dugun", "hortum", "gemi", "balon", "ucurtma", "kus", "film", "yaris", "marti", "dalga", "kar", "vapur", "balik", "tekne_yarisi"],
+    ikinci: ["firtina", "yangin", "kaza", "fok", "yunus", "zeplin", "dugun", "hortum", "balon", "ucurtma", "kus", "film", "yaris", "marti", "dalga", "kar", "vapur", "balik", "tekne_yarisi", "elektrik"] },
 ];
-// --- ajan D --- (olay-balon.js, olay-ucurtma.js, olay-kus.js, olay-moose.js)
-/** Island-specific event names (olay-plan.js OLAYLAR: [tr, en]). */
-export const ADLAR = { kus: ["Kel kartal", "Bald eagle"] };
-/** Bird event (olay-kus.js): a bald eagle circles the bay, dives for a fish, perches in a shore tree; own phases. */
-export const KUS = { tur: "kartal", evre: [[0.14, "gorundu"], [0.3, "dalis"], [0.86, "agacta"], [1, "uzaklasma"]] };
-/** Kite festival (olay-ucurtma.js): on the Town Green. */
-export const UCURTMA = { yer: "cimen", ad: "the Town Green" };
-// --- ajan D sonu ---
-/** Adaya özgü olay adları (olay-plan.js ADLAR: [tr, en]). --- ajan C --- */
-Object.assign(ADLAR, { yaris: ["Koşu (fun run)", "Fun run"], marti: ["Martı sosisli kaptı", "Seagull steals a hot dog"] });
-// --- ajan A (deniz ve kıyı olayları: olay-fok.js, olay-kopekbaligi.js, olay-hortum.js, olay-dalga.js) ---
-/** Adaya özgü olay adları ({ tur: [ad, en] }). */
-Object.assign(ADLAR, { fok: ["Liman fokları", "Harbor seals"], kopekbaligi: ["Köpekbalığı", "Shark sighting"], hortum: ["Su hortumu", "Waterspout"], dalga: ["Dev dalgalar", "Big waves"] });
-/** Fok: bir grup liman foku (benekli, küçük). */
-export const FOK = { tur: "liman", sayi: 5 };
-/** Su hortumu: kıyıdan uzaklık (m) ve bulut tabanı yüksekliği (m). */
-export const HORTUM = { uzak: 480, H: 320 };
-/** Pencereler (ET dk; takvime alınınca geçerli): sabah olayları SABAH_SON'dan (11:20) önce, öğleden sonrakiler 15:50'den
- *  (gün batımı ~16:20) önce biter. fok/köpekbalığı/dalga 40–55 dk, hortum 25–35 dk. */
-Object.assign(PENCERE, { fok: [480, 610], kopekbaligi: [480, 610], hortum: [480, 630], dalga: [470, 610] });
-Object.assign(IKINCI.pencere, { fok: [740, 860], kopekbaligi: [740, 860], hortum: [740, 880], dalga: [740, 860] });
-// --- ajan A sonu ---
+/** Adaya özgü olay adları (olay-plan.js OLAYLAR: [tr, görünen ad (de)]). */
+export const ADLAR = {
+  firtina: ["Fırtına", "Sturm"], sis: ["Sis", "Seenebel"], yangin: ["Yangın", "Feuer"], kaza: ["Kaza", "Unfall"],
+  fok: ["Seehundlar", "Seehunde auf der Sandbank"], yunus: ["Muturlar", "Schweinswale"], zeplin: ["Zeplin acil inişi", "Zeppelin-Notlandung"],
+  dugun: ["Düğün konvoyu", "Hochzeitskorso"], hortum: ["Su hortumu", "Wasserhose"], gemi: ["Dev gemi", "Containerriese"],
+  balon: ["Balonlar", "Heißluftballons"], ucurtma: ["Uçurtma şenliği", "Drachenfest"], kus: ["Göçmen kazlar", "Ringelgänse"],
+  film: ["Film çekimi", "Krimi-Dreh"], yaris: ["Ada maratonu", "Inselmarathon"], marti: ["Martı Fischbrötchen kaptı", "Möwe klaut Fischbrötchen"],
+  dalga: ["Fırtına kabarması", "Sturmflut"], kar: ["Kar", "Schnee"], vapur: ["Feribot arızası", "Fähre mit Maschinenschaden"],
+  balik: ["Dev av", "Riesenfang"], tekne_yarisi: ["Kutter yarışı", "Kutterregatta"], elektrik: ["Elektrik kesintisi", "Stromausfall"],
+};
+/** Kuş olayı (olay-kus.js): Ringelgans sürüsü (göç), Watt üstünde döner, setin önündeki bataklığa iner. */
+export const KUS = { tur: "kaz", evre: [[0.15, "gelis"], [0.75, "termik"], [1, "gidis"]] };
+/** Drachenfest (olay-ucurtma.js): setin önündeki çayırda değil, Marktplatz'ın kuzeyindeki Kurpark'ta değil: kumsalda. */
+export const UCURTMA = { yer: "plaj", ad: "der Hauptstrand" };
+/** Seehunde: bir grup liman foku (benekli, küçük) Seehundbank'ta ve kıyıda. */
+export const FOK = { tur: "liman", sayi: 7 };
+/** Wasserhose: kıyıdan uzaklık (m) ve bulut tabanı yüksekliği (m). */
+export const HORTUM = { uzak: 520, H: 320 };
